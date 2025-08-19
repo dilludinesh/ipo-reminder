@@ -1,22 +1,31 @@
 """Configuration settings for the IPO Reminder Bot."""
 import os
+import logging
 from typing import Optional
 from pathlib import Path
 from dotenv import load_dotenv
+
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 # Load environment variables from .env file
 env_path = Path(__file__).parent.parent / '.env'
 load_dotenv(env_path)
 
 # Email Configuration
+SMTP_SERVER = os.getenv("SMTP_SERVER", "smtp.office365.com")
+SMTP_PORT = int(os.getenv("SMTP_PORT", "587"))  # 587 for STARTTLS, 465 for SSL
 SENDER_EMAIL = os.getenv("OUTLOOK_EMAIL")
-if not SENDER_EMAIL:
-    raise ValueError("OUTLOOK_EMAIL environment variable is not set in .env file")
+SENDER_PASSWORD = os.getenv("OUTLOOK_APP_PASSWORD")
+RECIPIENT_EMAIL = os.getenv("RECIPIENT_EMAIL", SENDER_EMAIL)
 
-RECIPIENT_EMAIL = os.getenv("RECIPIENT_EMAIL")
-if not RECIPIENT_EMAIL:
-    RECIPIENT_EMAIL = SENDER_EMAIL
-    logger.warning("RECIPIENT_EMAIL not set, defaulting to SENDER_EMAIL")
+# Validate required configuration
+if not all([SENDER_EMAIL, SENDER_PASSWORD]):
+    raise ValueError(
+        "Missing required email configuration. "
+        "Please set OUTLOOK_EMAIL and OUTLOOK_APP_PASSWORD in your .env file"
+    )
 
 # Microsoft Graph API OAuth2 configuration
 CLIENT_ID = os.getenv('CLIENT_ID')

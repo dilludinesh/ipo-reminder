@@ -1,6 +1,12 @@
+# Core dependencies
 requests>=2.32.0
 beautifulsoup4>=4.12.3
+python-dotenv>=1.0.0
+
+# Data processing
 pandas>=2.2.2
 python-dateutil>=2.9.0.post0
-python-dotenv>=1.0.0
-msal>=1.24.0
+
+# Email
+secure-smtplib>=0.1.1
+email-validator>=2.1.0

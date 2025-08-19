@@ -1,16 +1,15 @@
 """Email sending functionality using Microsoft Graph API with OAuth2 authentication."""
 import logging
-import json
 import time
 import requests
 from typing import List, Optional
 from msal import ConfidentialClientApplication
 from .config import (
     SENDER_EMAIL, 
+    RECIPIENT_EMAIL,
     CLIENT_ID,
     CLIENT_SECRET,
-    TENANT_ID,
-    RECIPIENT_EMAIL
+    TENANT_ID
 )
 
 logger = logging.getLogger(__name__)
@@ -56,7 +55,7 @@ def send_email(
     retry_delay: float = 5.0
 ) -> None:
     """
-    Send an email using Microsoft Graph API with retry logic.
+    Send an email using Microsoft Graph API with OAuth2 authentication.
 
     Args:
         subject: Email subject
@@ -71,7 +70,7 @@ def send_email(
     """
     if not recipients:
         recipients = [RECIPIENT_EMAIL]
-    
+
     # Prepare email message
     email_msg = {
         'message': {
