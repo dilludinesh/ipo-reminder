@@ -419,7 +419,7 @@ def enrich_with_details(ipo: IPOInfo) -> IPOInfo:
         logger.error(f"Error enriching IPO {ipo.name if ipo else 'Unknown'}: {e}", exc_info=True)
         return ipo
 
-def today_ipos_closing(now_date: dt.date) -> List[IPOInfo]:
+def today_ipos_closing(now_date: date) -> List[IPOInfo]:
     ipos = get_upcoming_ipos()
     closing = []
     for ipo in ipos:
@@ -454,7 +454,7 @@ def decide_apply_avoid(ipo: IPOInfo) -> Tuple[str, str]:
         return "NEUTRAL (Listing gains) ⚖", "Mixed reviews but rising GMP"
     return "NEUTRAL ⚖", "Mixed/insufficient data; apply only if thesis fits"
 
-def format_email(now_date: dt.date, ipos: List[IPOInfo]) -> Tuple[str, str]:
+def format_email(now_date: date, ipos: List[IPOInfo]) -> Tuple[str, str]:
     subject = f"IPO Reminder – {now_date.strftime('%d %b %Y')} (Last-day alerts)"
     if not ipos:
         body = f"Hello 👋\n\nNo IPOs are closing today ({now_date.strftime('%d-%b-%Y')}).\n\n— IPO Reminder Bot"
