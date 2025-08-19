@@ -1,32 +1,73 @@
+"""Scraper for Chittorgarh IPO data."""
+import logging
 import re
 import time
-import json
-import datetime as dt
+import random
+from datetime import datetime, date
 from dataclasses import dataclass, asdict
-from typing import List, Optional, Tuple, Dict
+from typing import List, Optional, Dict, Any, Set, Tuple
 
 import requests
 from bs4 import BeautifulSoup
-import pandas as pd
 from dateutil import parser as dateparser
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
 
+from ..config import BASE_URL, REQUEST_TIMEOUT, REQUEST_RETRIES, REQUEST_DELAY, USER_AGENT
+
+# Configure logging
+logger = logging.getLogger(__name__)
+
+# Constants
+UPCOMING_PATH = "/ipo/ipo_calendar_timeline/"
+ALT_UPCOMING_PATH = "/report/latest-ipo-gmp/56/"
+
+# Headers to mimic a real browser
 HEADERS = {
-    "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119 Safari/537.36",
+    "User-Agent": USER_AGENT,
     "Accept-Language": "en-US,en;q=0.9",
-    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8",
+    "Accept-Encoding": "gzip, deflate, br",
+    "Connection": "keep-alive"
 }
 
-BASE = "https://www.chittorgarh.com"
-UPCOMING = BASE + "/ipo/ipo_calendar_timeline/"
-ALT_UPCOMING = BASE + "/report/latest-ipo-gmp/56/"  # fallback to get names/dates when calendar shifts
+# Set up a session with retry logic
+session = requests.Session()
+retry_strategy = Retry(
+    total=REQUEST_RETRIES,
+    backoff_factor=1,
+    status_forcelist=[429, 500, 502, 503, 504],
+    allowed_methods=["GET"]
+)
+adapter = HTTPAdapter(max_retries=retry_strategy)
+session.mount("http://", adapter)
+session.mount("https://", adapter)
 
 @dataclass
 class IPOInfo:
+    """Class representing an IPO with all relevant information.
+    
+    Attributes:
+        name: Name of the IPO
+        detail_url: URL to the IPO details page
+        gmp_url: URL to the GMP (Grey Market Premium) page
+        open_date: Date when the IPO opens for subscription
+        close_date: Date when the IPO closes
+        price_band: Price range per share
+        lot_size: Number of shares per lot
+        issue_size: Total size of the IPO issue
+        review_summary: Summary of the IPO review
+        expert_recommendation: Expert's recommendation
+        gmp_latest: Latest GMP value
+        gmp_trend: Trend of GMP (rising/steady/falling/unknown)
+        recommendation: Our recommendation (APPLY/AVOID/NEUTRAL)
+        recommendation_reason: Reason for the recommendation
+    """
     name: str
     detail_url: Optional[str]
     gmp_url: Optional[str]
-    open_date: Optional[dt.date]
-    close_date: Optional[dt.date]
+    open_date: Optional[date]
+    close_date: Optional[date]
     price_band: Optional[str] = None
     lot_size: Optional[str] = None
     issue_size: Optional[str] = None
@@ -34,107 +75,343 @@ class IPOInfo:
     expert_recommendation: Optional[str] = None
     gmp_latest: Optional[str] = None
     gmp_trend: Optional[str] = None  # rising/steady/falling/unknown
+    recommendation: Optional[str] = None  # APPLY/AVOID/NEUTRAL
+    recommendation_reason: Optional[str] = None
+    
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert IPOInfo to a dictionary.
+        
+        Returns:
+            Dictionary representation of the IPO
+        """
+        result = asdict(self)
+        # Convert date objects to ISO format strings
+        for field in ['open_date', 'close_date']:
+            if field in result and result[field] is not None:
+                result[field] = result[field].isoformat()
+        return result
+        
+    def is_closing_today(self, today: Optional[date] = None) -> bool:
+        """Check if the IPO is closing today.
+        
+        Args:
+            today: Reference date (defaults to today)
+            
+        Returns:
+            True if the IPO is closing today, False otherwise
+        """
+        if today is None:
+            today = date.today()
+        return self.close_date == today if self.close_date else False
 
-def _clean_text(t: str) -> str:
-    return re.sub(r"\s+", " ", t).strip()
+def _clean_text(text: str) -> str:
+    """Clean and normalize text by removing extra whitespace.
+    
+    Args:
+        text: Input text to clean
+        
+    Returns:
+        Cleaned text with normalized whitespace
+    """
+    if not text:
+        return ""
+    return re.sub(r"\s+", " ", str(text)).strip()
 
-def _parse_date(val: str) -> Optional[dt.date]:
-    if not val:
+def _parse_date(date_str: str) -> Optional[date]:
+    """Parse date string into a date object.
+    
+    Args:
+        date_str: Date string to parse (e.g., "01-Jan-2023")
+        
+    Returns:
+        datetime.date object or None if parsing fails
+    """
+    if not date_str or not isinstance(date_str, str):
         return None
-    val = val.replace("–", "-").replace("—", "-")
+        
+    # Common date string cleanups
+    date_str = date_str.strip()
+    date_str = date_str.replace("–", "-").replace("—", "-")
+    
     try:
-        return dateparser.parse(val, dayfirst=True, fuzzy=True).date()
-    except Exception:
+        parsed = dateparser.parse(date_str, dayfirst=True, fuzzy=True)
+        return parsed.date() if parsed else None
+    except (ValueError, OverflowError, AttributeError) as e:
+        logger.warning(f"Failed to parse date '{date_str}': {e}")
         return None
 
-def _fetch(url: str) -> Optional[BeautifulSoup]:
+def _fetch(url: str, params: Optional[Dict] = None) -> Optional[BeautifulSoup]:
+    """Fetch a URL and return a BeautifulSoup object.
+    
+    Args:
+        url: URL to fetch
+        params: Optional query parameters
+        
+    Returns:
+        BeautifulSoup object or None if request fails
+    """
+    if not url:
+        logger.error("No URL provided to _fetch")
+        return None
+        
     try:
-        r = requests.get(url, headers=HEADERS, timeout=20)
-        if r.status_code != 200:
+        # Add a small delay to be nice to the server
+        time.sleep(REQUEST_DELAY + random.uniform(0, 0.5))
+        
+        logger.debug(f"Fetching URL: {url}")
+        response = session.get(
+            url,
+            headers=HEADERS,
+            params=params,
+            timeout=REQUEST_TIMEOUT,
+            allow_redirects=True
+        )
+        
+        response.raise_for_status()
+        
+        # Check if we got rate limited or got a captcha page
+        if "captcha" in response.text.lower() or "access denied" in response.text.lower():
+            logger.warning("Possible CAPTCHA or access denied page detected")
             return None
-        return BeautifulSoup(r.text, "html.parser")
-    except Exception:
+            
+        return BeautifulSoup(response.text, 'html.parser')
+        
+    except requests.exceptions.RequestException as e:
+        logger.warning(f"Failed to fetch {url}: {e}")
+        return None
+    except Exception as e:
+        logger.error(f"Unexpected error fetching {url}: {e}", exc_info=True)
         return None
 
-def _find_ipo_rows(soup: BeautifulSoup) -> List[Dict]:
+def _find_ipo_rows(soup: BeautifulSoup) -> List[Dict[str, Any]]:
+    """Extract IPO information from HTML tables.
+    
+    Args:
+        soup: BeautifulSoup object containing the HTML
+        
+    Returns:
+        List of dictionaries containing IPO information
+    """
     rows = []
+    if not soup:
+        return rows
+        
     # Look for tables with IPO timelines
     for table in soup.select("table"):
-        headers = [ _clean_text(th.get_text(" ", strip=True)).lower() for th in table.select("thead th")]
-        if not headers:
-            # sometimes tables don't have thead; try first row
-            first = table.select_one("tr")
-            if first:
-                headers = [ _clean_text(th.get_text(" ", strip=True)).lower() for th in first.select("th")]
-        if not headers:
-            continue
-        # we expect columns like 'ipo name', 'open', 'close'
-        if any("ipo" in h and "name" in h for h in headers) and any("close" in h for h in headers):
+        try:
+            # Get headers from thead or first row
+            headers = [_clean_text(th.get_text(" ", strip=True)).lower() 
+                      for th in table.select("thead th") or table.select("tr:first-child th")]
+            
+            # Skip if not an IPO table
+            if not headers or not any("ipo" in h for h in headers) or not any("close" in h for h in headers):
+                continue
+                
+            # Process each row in the table body
             for tr in table.select("tbody tr"):
-                cols = [ _clean_text(td.get_text(" ", strip=True)) for td in tr.select("td") ]
-                links = tr.select("a[href]")
-                detail_url = None
-                gmp_url = None
-                for a in links:
-                    href = a.get("href")
-                    if href and "/ipo/" in href and not href.endswith("/ipo/"):
-                        detail_url = BASE + href if href.startswith("/") else href
-                    if href and "ipo_gmp" in href:
-                        gmp_url = BASE + href if href.startswith("/") else href
-                # map columns roughly
-                # attempt to find name/open/close by header index
-                d = dict()
-                for i, h in enumerate(headers):
-                    if i < len(cols):
-                        d[h] = cols[i]
-                name = cols[0] if cols else None
-                open_date = None
-                close_date = None
-                # find first header with 'open' and with 'close'
-                for i, h in enumerate(headers):
-                    if "open" in h and i < len(cols):
-                        open_date = _parse_date(cols[i])
-                    if "close" in h and i < len(cols):
-                        close_date = _parse_date(cols[i])
-                if name:
+                try:
+                    # Skip header rows
+                    if tr.select("th"):
+                        continue
+                        
+                    cols = [_clean_text(td.get_text(" ", strip=True)) 
+                           for td in tr.select("td")]
+                    
+                    if not cols:
+                        continue
+                        
+                    # Extract links
+                    links = tr.select("a[href]")
+                    detail_url = next((f"{BASE_URL}{a['href']}" if a['href'].startswith("/") else a['href']
+                                     for a in links if "/ipo/" in a.get('href', '') and not a['href'].endswith("/ipo/")), None)
+                    gmp_url = next((f"{BASE_URL}{a['href']}" if a['href'].startswith("/") else a['href']
+                                  for a in links if "ipo_gmp" in a.get('href', '')), None)
+                    
+                    # Map columns to headers
+                    row_data = {h: cols[i] if i < len(cols) else "" 
+                              for i, h in enumerate(headers)}
+                    
+                    # Extract dates
+                    open_date = next((_parse_date(cols[i]) for i, h in enumerate(headers) 
+                                    if i < len(cols) and "open" in h), None)
+                    close_date = next((_parse_date(cols[i]) for i, h in enumerate(headers) 
+                                     if i < len(cols) and "close" in h), None)
+                    
+                    # Skip if no name
+                    name = cols[0] if cols else None
+                    if not name:
+                        continue
+                        
                     rows.append({
-                        "name": name,
-                        "detail_url": detail_url,
-                        "gmp_url": gmp_url,
-                        "open_date": open_date,
-                        "close_date": close_date
+                        'name': name,
+                        'detail_url': detail_url,
+                        'gmp_url': gmp_url,
+                        'open_date': open_date,
+                        'close_date': close_date,
+                        **row_data
                     })
+                    
+                except Exception as e:
+                    logger.warning(f"Error processing table row: {e}")
+                    continue
+                    
+        except Exception as e:
+            logger.warning(f"Error processing table: {e}")
+            continue
+            
     return rows
 
 def get_upcoming_ipos() -> List[IPOInfo]:
-    soup = _fetch(UPCOMING)
-    rows = _find_ipo_rows(soup) if soup else []
-    if not rows:
-        # fallback to alternative page that at least lists many current IPOs
-        soup2 = _fetch(ALT_UPCOMING)
-        rows = _find_ipo_rows(soup2) if soup2 else []
+    """Fetch and parse upcoming IPOs from Chittorgarh website.
+    
+    This function tries multiple pages to get the most comprehensive list of IPOs.
+    
+    Returns:
+        List of IPOInfo objects containing IPO details
+    """
     ipos = []
-    for r in rows:
-        ipos.append(IPOInfo(
-            name=r.get("name"),
-            detail_url=r.get("detail_url"),
-            gmp_url=r.get("gmp_url"),
-            open_date=r.get("open_date"),
-            close_date=r.get("close_date"),
-        ))
-    return ipos
+    
+    # Try the main IPO calendar page first
+    logger.info("Fetching main IPO calendar page...")
+    soup = _fetch(f"{BASE_URL}{UPCOMING_PATH}")
+    if soup:
+        rows = _find_ipo_rows(soup)
+        if rows:
+            logger.info(f"Found {len(rows)} IPOs on main page")
+            ipos.extend(rows)
+    
+    # Fallback to alternative page if no IPOs found
+    if not ipos:
+        logger.info("No IPOs found on main page, trying alternative page...")
+        soup = _fetch(f"{BASE_URL}{ALT_UPCOMING_PATH}")
+        if soup:
+            rows = _find_ipo_rows(soup)
+            if rows:
+                logger.info(f"Found {len(rows)} IPOs on alternative page")
+                ipos.extend(rows)
+    
+    # Convert rows to IPOInfo objects
+    result = []
+    for row in ipos:
+        try:
+            ipo = IPOInfo(
+                name=row.get("name"),
+                detail_url=row.get("detail_url"),
+                gmp_url=row.get("gmp_url"),
+                open_date=row.get("open_date"),
+                close_date=row.get("close_date"),
+            )
+            result.append(ipo)
+        except Exception as e:
+            logger.warning(f"Failed to create IPOInfo for row {row}: {e}")
+    
+    logger.info(f"Successfully parsed {len(result)} IPOs")
+    return result
+
+def _parse_ipo_details(soup: BeautifulSoup) -> Dict[str, str]:
+    """Parse IPO details from the detail page HTML.
+    
+    Args:
+        soup: BeautifulSoup object of the IPO detail page
+        
+    Returns:
+        Dictionary containing parsed details (price_band, lot_size, etc.)
+    """
+    if not soup:
+        return {}
+        
+    details = {}
+    text = _clean_text(soup.get_text(" ", strip=True))
+    
+    # Extract price band
+    m = re.search(r"price\s*band[\s:]*₹?\s*([\d,]+)\s*[–-]\s*₹?\s*([\d,]+)", text, flags=re.I)
+    if m:
+        details['price_band'] = f"₹{m.group(1).strip()} - ₹{m.group(2).strip()}"
+    
+    # Extract lot size
+    m = re.search(r"lot\s*size[\s:]*([\d,]+)", text, flags=re.I)
+    if m:
+        details['lot_size'] = m.group(1).strip()
+    
+    # Extract issue size
+    m = re.search(r"issue\s*size[\s:]*₹?\s*([\d,.]+)\s*(?:cr\.?|crore)", text, flags=re.I)
+    if m:
+        details['issue_size'] = f"₹{m.group(1).strip()} crore"
+    
+    # Find review/analysis
+    review = soup.find("div", class_=re.compile("(?i)review|analysis|verdict"))
+    if review:
+        details['review_summary'] = _clean_text(review.get_text(" ", strip=True))
+    
+    return details
+
+def _parse_gmp_details(soup: BeautifulSoup) -> Dict[str, str]:
+    """Parse GMP details from the GMP page HTML.
+    
+    Args:
+        soup: BeautifulSoup object of the GMP page
+        
+    Returns:
+        Dictionary containing GMP details (gmp_latest, gmp_trend)
+    """
+    if not soup:
+        return {}
+        
+    details = {}
+    text = _clean_text(soup.get_text(" ", strip=True))
+    
+    # Extract latest GMP
+    m = re.search(r"latest\s*gmp[\s:]*₹?\s*([\d,.]+)", text, flags=re.I)
+    if m:
+        details['gmp_latest'] = f"₹{m.group(1).strip()}"
+    
+    # Determine GMP trend
+    if any(word in text.lower() for word in ["increase", "rise", "up"]):
+        details['gmp_trend'] = "rising"
+    elif any(word in text.lower() for word in ["decrease", "fall", "drop"]):
+        details['gmp_trend'] = "falling"
+    elif any(word in text.lower() for word in ["stable", "same", "unchanged"]):
+        details['gmp_trend'] = "steady"
+    
+    return details
 
 def enrich_with_details(ipo: IPOInfo) -> IPOInfo:
-    # Parse details from IPO page
-    if ipo.detail_url:
-        soup = _fetch(ipo.detail_url)
-        if soup:
-            # price band, lot size, issue size appear in key-value tables or bullet lists
-            text = _clean_text(soup.get_text(" ", strip=True))
-            # rough regexes
-            m = re.search(r"price\s*band[:\s]*₹?\s*([\d,]+)\s*[-–]\s*₹?\s*([\d,]+)", text, flags=re.I)
-            if m:
-                ipo.price_band = f"₹{m.group(1)} – ₹{m.group(2)}"
+    """Enrich IPO information with additional details from detail and GMP pages.
+    
+    Args:
+        ipo: IPOInfo object to enrich
+        
+    Returns:
+        Enriched IPOInfo object
+    """
+    if not ipo or not isinstance(ipo, IPOInfo):
+        logger.warning("Invalid IPOInfo object provided for enrichment")
+        return ipo
+    
+    try:
+        # Parse details from IPO page
+        if ipo.detail_url:
+            logger.debug(f"Fetching details for {ipo.name} from {ipo.detail_url}")
+            soup = _fetch(ipo.detail_url)
+            if soup:
+                details = _parse_ipo_details(soup)
+                for key, value in details.items():
+                    setattr(ipo, key, value)
+        
+        # Parse GMP data if available
+        if ipo.gmp_url:
+            logger.debug(f"Fetching GMP details for {ipo.name} from {ipo.gmp_url}")
+            soup = _fetch(ipo.gmp_url)
+            if soup:
+                gmp_details = _parse_gmp_details(soup)
+                for key, value in gmp_details.items():
+                    setattr(ipo, key, value)
+        
+        return ipo
+        
+    except Exception as e:
+        logger.error(f"Error enriching IPO {ipo.name if ipo else 'Unknown'}: {e}", exc_info=True)
+        return ipo
             m = re.search(r"(market\s*lot|lot\s*size)[:\s]*([\d,]+)\s*shares", text, flags=re.I)
             if m:
                 ipo.lot_size = f"{m.group(2)} shares"
