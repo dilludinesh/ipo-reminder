@@ -308,73 +308,6 @@ def get_upcoming_ipos() -> List[IPOInfo]:
     logger.info(f"Successfully parsed {len(result)} IPOs")
     return result
 
-def _parse_ipo_details(soup: BeautifulSoup) -> Dict[str, str]:
-    """Parse IPO details from the detail page HTML.
-    
-    Args:
-        soup: BeautifulSoup object of the IPO detail page
-        
-    Returns:
-        Dictionary containing parsed details (price_band, lot_size, etc.)
-    """
-    if not soup:
-        return {}
-        
-    details = {}
-    text = _clean_text(soup.get_text(" ", strip=True))
-    
-    # Extract price band
-    m = re.search(r"price\s*band[\s:]*₹?\s*([\d,]+)\s*[–-]\s*₹?\s*([\d,]+)", text, flags=re.I)
-    if m:
-        details['price_band'] = f"₹{m.group(1).strip()} - ₹{m.group(2).strip()}"
-    
-    # Extract lot size
-    m = re.search(r"lot\s*size[\s:]*([\d,]+)", text, flags=re.I)
-    if m:
-        details['lot_size'] = m.group(1).strip()
-    
-    # Extract issue size
-    m = re.search(r"issue\s*size[\s:]*₹?\s*([\d,.]+)\s*(?:cr\.?|crore)", text, flags=re.I)
-    if m:
-        details['issue_size'] = f"₹{m.group(1).strip()} crore"
-    
-    # Find review/analysis
-    review = soup.find("div", class_=re.compile("(?i)review|analysis|verdict"))
-    if review:
-        details['review_summary'] = _clean_text(review.get_text(" ", strip=True))
-    
-    return details
-
-def _parse_gmp_details(soup: BeautifulSoup) -> Dict[str, str]:
-    """Parse GMP details from the GMP page HTML.
-    
-    Args:
-        soup: BeautifulSoup object of the GMP page
-        
-    Returns:
-        Dictionary containing GMP details (gmp_latest, gmp_trend)
-    """
-    if not soup:
-        return {}
-        
-    details = {}
-    text = _clean_text(soup.get_text(" ", strip=True))
-    
-    # Extract latest GMP
-    m = re.search(r"latest\s*gmp[\s:]*₹?\s*([\d,.]+)", text, flags=re.I)
-    if m:
-        details['gmp_latest'] = f"₹{m.group(1).strip()}"
-    
-    # Determine GMP trend
-    if any(word in text.lower() for word in ["increase", "rise", "up"]):
-        details['gmp_trend'] = "rising"
-    elif any(word in text.lower() for word in ["decrease", "fall", "drop"]):
-        details['gmp_trend'] = "falling"
-    elif any(word in text.lower() for word in ["stable", "same", "unchanged"]):
-        details['gmp_trend'] = "steady"
-    
-    return details
-
 def enrich_with_details(ipo: IPOInfo) -> IPOInfo:
     """Enrich IPO information with additional details from detail and GMP pages.
     
@@ -394,103 +327,97 @@ def enrich_with_details(ipo: IPOInfo) -> IPOInfo:
             logger.debug(f"Fetching details for {ipo.name} from {ipo.detail_url}")
             soup = _fetch(ipo.detail_url)
             if soup:
-                details = _parse_ipo_details(soup)
-                for key, value in details.items():
-                    setattr(ipo, key, value)
-        
-        # Parse GMP data if available
+                text = _clean_text(soup.get_text(" ", strip=True))
+                # Extract price band
+                m = re.search(r"price\s*band[\s:]*₹?\s*([\d,]+)\s*[–-]\s*₹?\s*([\d,]+)", text, flags=re.I)
+                if m:
+                    ipo.price_band = f"₹{m.group(1).strip()} - ₹{m.group(2).strip()}"
+                
+                m = re.search(r"(market\s*lot|lot\s*size)[:\s]*([\d,]+)\s*shares", text, flags=re.I)
+                if m:
+                    ipo.lot_size = f"{m.group(2)} shares"
+                m = re.search(r"(issue\s*size)[:\s]*₹?\s*([₹\d.,\sA-Za-z]+)", text, flags=re.I)
+                if m:
+                    ipo.issue_size = _clean_text(m.group(2))
+                # reviews
+                review_section = None
+                for h in soup.select("h2, h3"):
+                    if "review" in h.get_text(" ", strip=True).lower():
+                        review_section = h
+                        break
+                if review_section:
+                    # capture some text following the header
+                    snippet = []
+                    node = review_section
+                    for _ in range(10):
+                        node = node.find_next_sibling()
+                        if not node:
+                            break
+                        snippet.append(node.get_text(" ", strip=True))
+                    combined = " ".join(snippet)
+                    combined = _clean_text(combined)
+                    ipo.review_summary = combined[:550] + ("..." if len(combined) > 550 else "")
+                    # expert recommendation heuristic
+                    if re.search(r"\bsubscribe|apply\b", combined, flags=re.I):
+                        ipo.expert_recommendation = "Subscribe"
+                    elif re.search(r"\bavoid\b", combined, flags=re.I):
+                        ipo.expert_recommendation = "Avoid"
+                    elif re.search(r"\bneutral|listed gains?|listing gains?\b", combined, flags=re.I):
+                        ipo.expert_recommendation = "Neutral"
+
+        # Attempt to fetch GMP page
+        if not ipo.gmp_url and ipo.detail_url:
+            # Guess GMP URL from slug
+            m = re.search(r"/ipo/([^/]+)/", ipo.detail_url)
+            if m:
+                slug = m.group(1)
+                ipo.gmp_url = f"{BASE_URL}/ipo_gmp/{slug}/"
         if ipo.gmp_url:
             logger.debug(f"Fetching GMP details for {ipo.name} from {ipo.gmp_url}")
             soup = _fetch(ipo.gmp_url)
             if soup:
-                gmp_details = _parse_gmp_details(soup)
-                for key, value in gmp_details.items():
-                    setattr(ipo, key, value)
-        
+                # try to locate a table with GMP history
+                tables = soup.select("table")
+                gmp_vals = []
+                for table in tables:
+                    headers = [re.sub(r"\s+", " ", th.get_text(" ", strip=True)).lower() for th in table.select("th")]
+                    if any("gmp" in h for h in headers):
+                        for tr in table.select("tbody tr"):
+                            tds = [re.sub(r"\s+", " ", td.get_text(" ", strip=True)) for td in tr.select("td")]
+                            # find number in row
+                            for cell in tds:
+                                m = re.search(r"(-?\d+)", cell.replace(",", ""))
+                                if m:
+                                    try:
+                                        gmp_vals.append(int(m.group(1)))
+                                        break
+                                    except:
+                                        pass
+                if gmp_vals:
+                    ipo.gmp_latest = f"₹{gmp_vals[0]}"  # assuming first row is latest; adjust if needed
+                    if len(gmp_vals) >= 3:
+                        # simple trend using last 3
+                        last3 = gmp_vals[:3]
+                        if last3[0] > last3[1] >= last3[2]:
+                            ipo.gmp_trend = "rising"
+                        elif last3[0] < last3[1] <= last3[2]:
+                            ipo.gmp_trend = "falling"
+                        else:
+                            ipo.gmp_trend = "steady"
+                    else:
+                        ipo.gmp_trend = "unknown"
+                else:
+                    # fallback: try to find a single GMP value in page text
+                    txt = _clean_text(soup.get_text(" ", strip=True))
+                    m = re.search(r"gmp[^₹\d-]*([₹]?\s*-?\d+)", txt, flags=re.I)
+                    if m:
+                        ipo.gmp_latest = m.group(1).replace(" ", "")
+                        ipo.gmp_trend = "unknown"
         return ipo
         
     except Exception as e:
         logger.error(f"Error enriching IPO {ipo.name if ipo else 'Unknown'}: {e}", exc_info=True)
         return ipo
-            m = re.search(r"(market\s*lot|lot\s*size)[:\s]*([\d,]+)\s*shares", text, flags=re.I)
-            if m:
-                ipo.lot_size = f"{m.group(2)} shares"
-            m = re.search(r"(issue\s*size)[:\s]*₹?\s*([₹\d.,\sA-Za-z]+)", text, flags=re.I)
-            if m:
-                ipo.issue_size = _clean_text(m.group(2))
-            # reviews
-            review_section = None
-            for h in soup.select("h2, h3"):
-                if "review" in h.get_text(" ", strip=True).lower():
-                    review_section = h
-                    break
-            if review_section:
-                # capture some text following the header
-                snippet = []
-                node = review_section
-                for _ in range(10):
-                    node = node.find_next_sibling()
-                    if not node:
-                        break
-                    snippet.append(node.get_text(" ", strip=True))
-                combined = " ".join(snippet)
-                combined = _clean_text(combined)
-                ipo.review_summary = combined[:550] + ("..." if len(combined) > 550 else "")
-                # expert recommendation heuristic
-                if re.search(r"\bsubscribe|apply\b", combined, flags=re.I):
-                    ipo.expert_recommendation = "Subscribe"
-                elif re.search(r"\bavoid\b", combined, flags=re.I):
-                    ipo.expert_recommendation = "Avoid"
-                elif re.search(r"\bneutral|listed gains?|listing gains?\b", combined, flags=re.I):
-                    ipo.expert_recommendation = "Neutral"
-    # Attempt to fetch GMP page
-    if not ipo.gmp_url and ipo.detail_url:
-        # Guess GMP URL from slug
-        m = re.search(r"/ipo/([^/]+)/", ipo.detail_url)
-        if m:
-            slug = m.group(1)
-            ipo.gmp_url = f"{BASE}/ipo_gmp/{slug}/"
-    if ipo.gmp_url:
-        soup = _fetch(ipo.gmp_url)
-        if soup:
-            # try to locate a table with GMP history
-            tables = soup.select("table")
-            gmp_vals = []
-            for table in tables:
-                headers = [re.sub(r"\s+", " ", th.get_text(" ", strip=True)).lower() for th in table.select("th")]
-                if any("gmp" in h for h in headers):
-                    for tr in table.select("tbody tr"):
-                        tds = [re.sub(r"\s+", " ", td.get_text(" ", strip=True)) for td in tr.select("td")]
-                        # find number in row
-                        for cell in tds:
-                            m = re.search(r"(-?\d+)", cell.replace(",", ""))
-                            if m:
-                                try:
-                                    gmp_vals.append(int(m.group(1)))
-                                    break
-                                except:
-                                    pass
-            if gmp_vals:
-                ipo.gmp_latest = f"₹{gmp_vals[0]}"  # assuming first row is latest; adjust if needed
-                if len(gmp_vals) >= 3:
-                    # simple trend using last 3
-                    last3 = gmp_vals[:3]
-                    if last3[0] > last3[1] >= last3[2]:
-                        ipo.gmp_trend = "rising"
-                    elif last3[0] < last3[1] <= last3[2]:
-                        ipo.gmp_trend = "falling"
-                    else:
-                        ipo.gmp_trend = "steady"
-                else:
-                    ipo.gmp_trend = "unknown"
-            else:
-                # fallback: try to find a single GMP value in page text
-                txt = _clean_text(soup.get_text(" ", strip=True))
-                m = re.search(r"gmp[^₹\d-]*([₹]?\s*-?\d+)", txt, flags=re.I)
-                if m:
-                    ipo.gmp_latest = m.group(1).replace(" ", "")
-                    ipo.gmp_trend = "unknown"
-    return ipo
 
 def today_ipos_closing(now_date: dt.date) -> List[IPOInfo]:
     ipos = get_upcoming_ipos()

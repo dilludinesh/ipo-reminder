@@ -1,6 +1,6 @@
 import datetime as dt
 from .sources.chittorgarh import today_ipos_closing, format_email
-from .emailer import send_email
+from .emailer import send_email, format_html_email
 
 def handler():
     # Use IST calendar date for "today"
@@ -11,7 +11,9 @@ def handler():
 
     ipos = today_ipos_closing(today)
     subject, body = format_email(today, ipos)
-    send_email(subject, body)
+    html_body = format_html_email(ipos, today.strftime('%d %b %Y'))
+
+    send_email(subject, body, html_body=html_body)
 
 if __name__ == "__main__":
     handler()
