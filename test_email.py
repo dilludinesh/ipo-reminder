@@ -1,14 +1,17 @@
-"""Test script for email functionality using SMTP with App Password."""
+"""Test script for email functionality using Microsoft Graph API."""
 import logging
 import os
-import time
+import sys
 from datetime import datetime, timedelta
 from ipo_reminder.emailer import send_email, format_html_email
 
 # Configure logging
 logging.basicConfig(
     level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.StreamHandler(sys.stdout)
+    ]
 )
 logger = logging.getLogger(__name__)
 
@@ -16,9 +19,9 @@ def test_send_email():
     """Test sending an email with both plain text and HTML content."""
     try:
         # Test data
-        subject = "📈 Test Email from IPO Reminder Bot"
+        subject = "📈 Test Email from IPO Reminder Bot (Outlook)"
         plain_text = """
-        This is a test email from the IPO Reminder Bot.
+        This is a test email from the IPO Reminder Bot using Outlook SMTP.
         
         If you can read this, the email sending functionality is working correctly!
         """
@@ -39,7 +42,11 @@ def test_send_email():
         
         html_content = format_html_email(test_ipos, datetime.now().strftime('%Y-%m-%d'))
         
-        logger.info("Sending test email...")
+        logger.info("Testing Outlook SMTP configuration...")
+        logger.info(f"From: {os.getenv('SENDER_EMAIL')}")
+        logger.info(f"To: {os.getenv('RECIPIENT_EMAIL')}")
+        
+        logger.info("Sending test email via Outlook SMTP...")
         
         # Send the email
         send_email(
@@ -53,21 +60,40 @@ def test_send_email():
         
     except Exception as e:
         logger.error(f"❌ Failed to send test email: {str(e)}")
+        logger.error("Please check the following:")
+        logger.error("1. Your internet connection")
+        logger.error("2. Outlook account settings (2FA must be enabled)")
+        logger.error("3. App Password is correctly generated from Microsoft Account")
+        logger.error("4. Sender email and password in .env are correct")
         return False
 
 if __name__ == "__main__":
-    required_vars = ["OUTLOOK_EMAIL", "OUTLOOK_APP_PASSWORD"]
+    required_vars = ["SENDER_EMAIL", "SENDER_PASSWORD"]
     missing_vars = [var for var in required_vars if not os.getenv(var)]
     
     if missing_vars:
         logger.error(f"❌ Missing required environment variables: {', '.join(missing_vars)}")
         logger.info("\nPlease create a .env file with the following variables:")
         logger.info("""
-OUTLOOK_EMAIL=your_email@example.com
-OUTLOOK_APP_PASSWORD=your_app_password
-RECIPIENT_EMAIL=recipient@example.com  # Optional, defaults to OUTLOOK_EMAIL
-SMTP_SERVER=smtp.office365.com  # Default for Outlook
-SMTP_PORT=587  # Default for STARTTLS
+# Email Configuration
+SENDER_EMAIL=your_outlook_email@example.com
+SENDER_PASSWORD=your_outlook_app_password_here  # Generate from: https://account.microsoft.com/security
+
+# Optional: If different from sender email
+RECIPIENT_EMAIL=recipient@example.com
+
+# Web Scraping Configuration (optional)
+REQUEST_TIMEOUT=30
+REQUEST_RETRIES=3
+REQUEST_DELAY=1.0
         """)
+        sys.exit(1)
+    
+    logger.info("Starting Microsoft Graph API email test...")
+    success = test_send_email()
+    
+    if success:
+        logger.info("✅ Email test completed successfully!")
     else:
-        test_send_email()
+        logger.error("❌ Email test failed. Please check the error messages above.")
+        sys.exit(1)

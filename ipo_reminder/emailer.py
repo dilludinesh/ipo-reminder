@@ -1,43 +1,48 @@
-"""Email sending functionality using Microsoft Graph API with OAuth2 authentication."""
+"""Email sending functionality for Outlook using Microsoft Graph API with OAuth2."""
 import logging
+import os
+import json
 import time
 import requests
+import msal
 from typing import List, Optional
-from msal import ConfidentialClientApplication
-from .config import (
-    SENDER_EMAIL, 
-    RECIPIENT_EMAIL,
-    CLIENT_ID,
-    CLIENT_SECRET,
-    TENANT_ID
-)
+from .config import SENDER_EMAIL, RECIPIENT_EMAIL
+
+# Microsoft Graph API Configuration
+CLIENT_ID = os.getenv('CLIENT_ID')
+CLIENT_SECRET = os.getenv('CLIENT_SECRET')
+TENANT_ID = os.getenv('TENANT_ID', 'common')
+AUTHORITY = f"https://login.microsoftonline.com/{TENANT_ID}"
+SCOPES = ["https://graph.microsoft.com/.default"]
+GRAPH_ENDPOINT = 'https://graph.microsoft.com/v1.0'
 
 logger = logging.getLogger(__name__)
-
-# Microsoft Graph API endpoints
-AUTHORITY = f'https://login.microsoftonline.com/{TENANT_ID}'
-SCOPE = ['https://graph.microsoft.com/.default']
-GRAPH_ENDPOINT = 'https://graph.microsoft.com/v1.0'
 
 class EmailError(Exception):
     """Custom exception for email sending errors."""
     pass
 
-def get_access_token() -> str:
+def get_access_token():
     """Get an access token using client credentials flow."""
     try:
-        app = ConfidentialClientApplication(
+        # Create a confidential client application
+        app = msal.ConfidentialClientApplication(
             client_id=CLIENT_ID,
             client_credential=CLIENT_SECRET,
             authority=AUTHORITY
         )
+
+        # Try to get a token from cache
+        result = app.acquire_token_silent(SCOPES, account=None)
         
-        result = app.acquire_token_for_client(scopes=SCOPE)
-        
-        if 'access_token' in result:
-            return result['access_token']
+        if not result:
+            logger.info("No suitable token exists in cache. Getting a new one.")
+            result = app.acquire_token_for_client(scopes=SCOPES)
+
+        if "access_token" in result:
+            return result["access_token"]
         else:
-            error_msg = f"Failed to get access token: {result.get('error')} - {result.get('error_description')}"
+            error_msg = f"Could not acquire token: {result.get('error')} - {result.get('error_description')}"
             logger.error(error_msg)
             raise EmailError(error_msg)
             
@@ -49,80 +54,103 @@ def get_access_token() -> str:
 def send_email(
     subject: str,
     body: str,
-    recipients: Optional[List[str]] = None,
     html_body: Optional[str] = None,
+    recipients: Optional[List[str]] = None,
     max_retries: int = 3,
-    retry_delay: float = 5.0
-) -> None:
+    retry_delay: int = 5
+) -> bool:
     """
-    Send an email using Microsoft Graph API with OAuth2 authentication.
-
+    Send an email using Microsoft Graph API with OAuth2.
+    
     Args:
         subject: Email subject
         body: Plain text email body
+        html_body: Optional HTML email body (if not provided, plain text will be used)
         recipients: List of recipient email addresses (defaults to RECIPIENT_EMAIL from config)
-        html_body: Optional HTML version of the email
         max_retries: Maximum number of retry attempts
-        retry_delay: Delay between retries in seconds
-
-    Raises:
-        EmailError: If email sending fails after all retries
+        retry_delay: Initial delay between retries in seconds (will be doubled after each retry)
+        
+    Returns:
+        bool: True if email was sent successfully, False otherwise
     """
     if not recipients:
         recipients = [RECIPIENT_EMAIL]
-
-    # Prepare email message
+    
+    # Prepare the email message
     email_msg = {
-        'message': {
-            'subject': subject,
-            'body': {
-                'contentType': 'HTML' if html_body else 'Text',
-                'content': html_body if html_body else body
+        "message": {
+            "subject": subject,
+            "body": {
+                "contentType": "HTML" if (html_body and html_body.strip()) else "Text",
+                "content": html_body if (html_body and html_body.strip()) else body
             },
-            'toRecipients': [{'emailAddress': {'address': recipient}} for recipient in recipients]
+            "toRecipients": [{"emailAddress": {"address": addr}} for addr in recipients],
+            "from": {
+                "emailAddress": {
+                    "address": SENDER_EMAIL
+                }
+            }
         },
-        'saveToSentItems': 'true'
+        "saveToSentItems": "true"
     }
-
-    # Setup API request with retry logic
-    last_exception = None
+    
+    access_token = None
     for attempt in range(1, max_retries + 1):
         try:
-            # Get access token
+            # Get a fresh access token for each attempt
             access_token = get_access_token()
             
-            # Send email using Microsoft Graph API
+            # Send the email using Microsoft Graph API
             headers = {
                 'Authorization': f'Bearer {access_token}',
                 'Content-Type': 'application/json'
             }
             
             response = requests.post(
-                f'{GRAPH_ENDPOINT}/users/{SENDER_EMAIL}/sendMail',
+                f"{GRAPH_ENDPOINT}/users/{SENDER_EMAIL}/sendMail",
                 headers=headers,
-                json=email_msg
+                json=email_msg,
+                timeout=30
             )
             
-            if response.status_code == 202:  # 202 Accepted
-                logger.info(f"Email sent successfully to {', '.join(recipients)}")
-                return
-            else:
-                error_msg = f"Failed to send email. Status code: {response.status_code}, Response: {response.text}"
-                logger.warning(f"Attempt {attempt}/{max_retries} failed: {error_msg}")
+            # Check for rate limiting (HTTP 429)
+            if response.status_code == 429:
+                retry_after = int(response.headers.get('Retry-After', retry_delay))
+                logger.warning(f"Rate limited. Retrying after {retry_after} seconds...")
+                time.sleep(retry_after)
+                continue
                 
-        except Exception as e:
-            last_exception = e
-            logger.warning(f"Attempt {attempt}/{max_retries} failed to send email: {str(e)}")
-        
-        if attempt < max_retries:
-            time.sleep(retry_delay * (2 ** (attempt - 1)))  # Exponential backoff
+            # Check for authentication errors
+            if response.status_code == 401:
+                logger.warning("Authentication expired. Refreshing token...")
+                access_token = get_access_token()
+                continue
+                
+            response.raise_for_status()
+            logger.info(f"Email sent successfully to {', '.join(recipients)}")
+            return True
+            
+        except requests.exceptions.RequestException as e:
+            error_msg = f"Error sending email (attempt {attempt}/{max_retries}): {str(e)}"
+            if hasattr(e, 'response') and e.response is not None:
+                try:
+                    error_details = e.response.json()
+                    error_msg += f"\nResponse: {json.dumps(error_details, indent=2)}"
+                except:
+                    error_msg += f"\nResponse: {e.response.text}"
+            
+            logger.warning(error_msg)
+            
+            if attempt < max_retries:
+                # Exponential backoff
+                wait_time = retry_delay * (2 ** (attempt - 1))
+                logger.warning(f"Retrying in {wait_time} seconds...")
+                time.sleep(wait_time)
+            else:
+                logger.error(f"Failed to send email after {max_retries} attempts")
+                return False
     
-    # If we get here, all attempts failed
-    error_msg = f"Failed to send email after {max_retries} attempts"
-    if last_exception:
-        error_msg += f": {str(last_exception)}"
-    logger.error(error_msg)
-    raise EmailError(error_msg)
+    return False
 
 def format_html_email(ipos: list, now_date: str) -> str:
     """Format IPO information as an HTML email."""
