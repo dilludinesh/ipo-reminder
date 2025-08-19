@@ -19,7 +19,7 @@ from ..config import BASE_URL, REQUEST_TIMEOUT, REQUEST_RETRIES, REQUEST_DELAY, 
 logger = logging.getLogger(__name__)
 
 # Constants
-UPCOMING_PATH = "/ipo/ipo_calendar_timeline/"
+UPCOMING_PATH = "/"
 ALT_UPCOMING_PATH = "/report/latest-ipo-gmp/56/"
 
 # Headers to mimic a real browser
