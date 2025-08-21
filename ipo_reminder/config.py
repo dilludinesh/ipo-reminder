@@ -6,6 +6,14 @@ from pathlib import Path
 from dotenv import load_dotenv
 
 # Configure logging
+"""Configuration settings for the IPO Reminder Bot."""
+import os
+import logging
+from typing import Optional
+from pathlib import Path
+from dotenv import load_dotenv
+
+# Configure logging
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',

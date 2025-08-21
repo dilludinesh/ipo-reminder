@@ -1,4 +1,4 @@
-# IPO Reminder Bot (Free • GitHub Actions • Outlook Email)
+# IPO Reminder Bot
 
 Daily **8:30 AM IST** cloud job that emails you IPOs **closing today** with a clear **Apply / Avoid** suggestion and details (price band, lot size, GMP trend, expert view).
 
@@ -11,14 +11,50 @@ Daily **8:30 AM IST** cloud job that emails you IPOs **closing today** with a cl
 
 ## Quick Start
 
-1. **Create a new GitHub repo** and upload these files.
-2. Go to **Settings → Secrets and variables → Actions → New repository secret** and add:
-   - `OUTLOOK_EMAIL` — your Outlook address (e.g., `you@outlook.com`)
-   - `OUTLOOK_APP_PASSWORD` — an **App Password** (recommended if 2FA enabled) or your Outlook password
-   - `RECIPIENT_EMAIL` — the email to receive reminders (can be same as your Outlook)
-3. Commit and push. The workflow runs daily at **8:30 AM IST**.
+### Option 1: SMTP (Easiest)
+1. **Fork this repo** or create a new one with these files.
+2. **Copy `.env.template` to `.env`** and fill in your credentials:
+   ```bash
+   cp .env.template .env
+   # Edit .env with your email credentials
+   ```
+3. **Get Outlook App Password** (if using 2FA): 
+   - Go to https://account.microsoft.com/security
+   - Create a new app password for "Mail"
+4. **Test locally** (optional):
+   ```bash
+   python -m ipo_reminder.ipo_reminder --dry-run
+   ```
+5. **For GitHub Actions**: Add repository secrets:
+   - `SENDER_EMAIL` or `OUTLOOK_EMAIL` — your Outlook address
+   - `SENDER_PASSWORD` or `OUTLOOK_APP_PASSWORD` — your app password
+   - `RECIPIENT_EMAIL` — email to receive reminders
 
-> App Password help: In Microsoft account security, create an app password for SMTP if 2FA is ON.
+### Option 2: Microsoft Graph API (Production)
+1. **Create Azure App Registration**
+2. **Add these repository secrets**:
+   - `CLIENT_ID`, `CLIENT_SECRET`, `TENANT_ID`
+   - `SENDER_EMAIL`, `RECIPIENT_EMAIL`
+3. **Grant Mail.Send permission** and admin consent
+
+---
+
+## Local Development
+
+```bash
+# Install dependencies
+pip install -r requirements.txt
+
+# Copy and edit config
+cp .env.template .env
+# Fill in your credentials in .env
+
+# Test without sending email
+python -m ipo_reminder.ipo_reminder --dry-run
+
+# Run for real
+python -m ipo_reminder.ipo_reminder
+```
 
 ---
 
