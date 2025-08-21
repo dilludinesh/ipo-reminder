@@ -59,6 +59,35 @@ coverage.xml
 # VS Code
 .vscode/
 
+# Operating System files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Temporary files
+*.tmp
+*.temp
+*.bak
+*.backup
+*.log
+logs/
+
+# IDE files
+.idea/
+*.swp
+*.swo
+*~
+
+# Application specific temporary files
+test_*.py
+!test_email.py
+SETUP_*.md
+EMAIL_SETUP_*.md
+
 # mypy
 .mypy_cache/
 .dmypy.json
