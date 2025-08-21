@@ -103,6 +103,17 @@ def send_email(
     if not recipients:
         recipients = [RECIPIENT_EMAIL]
 
+    # Check if sender email is a personal account
+    sender_domain = SENDER_EMAIL.split('@')[1] if '@' in SENDER_EMAIL else ''
+    is_personal_account = sender_domain.lower() in ['live.com', 'hotmail.com', 'outlook.com', 'gmail.com']
+    
+    # For personal accounts, try SMTP first since Graph API application permissions don't work well
+    if is_personal_account:
+        logger.info("Personal account detected, trying SMTP first")
+        if _send_via_smtp(subject, body, html_body, recipients):
+            return True
+        logger.warning("SMTP failed for personal account, trying Graph API anyway")
+
     email_msg = {
         "message": {
             "subject": subject,
@@ -162,7 +173,9 @@ def send_email(
                     time.sleep(wait_time)
                 else:
                     logger.error(f"Failed to send email after {max_retries} attempts using Graph API")
-                    return False
+                    # Try SMTP fallback as final attempt
+                    logger.info("Trying SMTP fallback after Graph API failure")
+                    return _send_via_smtp(subject, body, html_body, recipients)
 
         return False
 
