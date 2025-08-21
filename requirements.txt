@@ -13,3 +13,6 @@ pandas>=2.2.2
 secure-smtplib>=0.1.1
 email-validator>=2.1.0
 exchangelib>=5.5.1
+
+# Development
+pre-commit>=3.4.0

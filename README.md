@@ -90,3 +90,21 @@ For CI (GitHub Actions), store sensitive values as repository secrets and refere
 - `OUTLOOK_APP_PASSWORD` (if using SMTP fallback)
 
 Do not copy secret values into files in the repo. If a secret is accidentally committed, rotate it immediately and remove it from git history.
+
+Local developer setup (recommended):
+
+1. Create a virtualenv and install deps:
+
+```bash
+python -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+```
+
+2. Install pre-commit hooks:
+
+```bash
+pre-commit install
+```
+
+This will block accidental commits of `.env` or common secret patterns.
