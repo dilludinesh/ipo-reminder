@@ -29,4 +29,13 @@ jobs:
           OUTLOOK_EMAIL: ${{ secrets.OUTLOOK_EMAIL }}
           OUTLOOK_APP_PASSWORD: ${{ secrets.OUTLOOK_APP_PASSWORD }}
           RECIPIENT_EMAIL: ${{ secrets.RECIPIENT_EMAIL }}
-        run: python -m ipo_reminder.ipo_reminder
+          CLIENT_ID: ${{ secrets.CLIENT_ID }}
+          CLIENT_SECRET: ${{ secrets.CLIENT_SECRET }}
+          TENANT_ID: ${{ secrets.TENANT_ID }}
+        run: |
+          # Safety: fail if a .env file with secrets exists in the repository
+          if [ -f .env ]; then
+            echo ".env file found in repo. Exiting to avoid leaking secrets in CI." >&2
+            exit 1
+          fi
+          python -m ipo_reminder.ipo_reminder
