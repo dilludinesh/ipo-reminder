@@ -76,3 +76,17 @@ python ipo_reminder/main.py
 ## Timezone
 
 GitHub Actions uses UTC. The workflow cron `0 3 * * *` maps to **08:30 IST**.
+
+## Secrets and CI (important)
+
+Never commit secrets or credentials to the repository. Use a local `.env` file for development and keep it listed in `.gitignore`.
+
+For CI (GitHub Actions), store sensitive values as repository secrets and reference them in workflows. Example secrets to add in the repository settings:
+
+- `CLIENT_ID`
+- `CLIENT_SECRET`
+- `TENANT_ID`
+- `OUTLOOK_EMAIL` (or `SENDER_EMAIL`)
+- `OUTLOOK_APP_PASSWORD` (if using SMTP fallback)
+
+Do not copy secret values into files in the repo. If a secret is accidentally committed, rotate it immediately and remove it from git history.
