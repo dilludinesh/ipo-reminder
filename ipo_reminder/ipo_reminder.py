@@ -3,6 +3,7 @@ import datetime as dt
 import sys
 import os
 from .sources.chittorgarh import today_ipos_closing, format_email
+from .sources.fallback import get_fallback_ipos
 from .emailer import send_email, format_html_email
 
 
@@ -54,8 +55,16 @@ def handler(dry_run=False):
     ist = now_utc + dt.timedelta(hours=5, minutes=30)
     today = ist.date()
 
+    # Try primary source first
     ipos = today_ipos_closing(today)
-    logger.info(f"Found {len(ipos)} IPO(s) closing today.")
+    logger.info(f"Found {len(ipos)} IPO(s) closing today from primary source.")
+    
+    # If no IPOs found, try fallback sources
+    if not ipos:
+        logger.info("No IPOs found from primary source, trying fallback sources...")
+        ipos = get_fallback_ipos(today)
+        logger.info(f"Found {len(ipos)} IPO(s) closing today from fallback sources.")
+    
     subject, body = format_email(today, ipos)
     html_body = format_html_email(ipos, today.strftime('%d %b %Y'))
 
