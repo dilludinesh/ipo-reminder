@@ -2,44 +2,10 @@ import logging
 import datetime as dt
 import sys
 import os
+from .config import check_email_config
 from .sources.chittorgarh import today_ipos_closing, format_email
 from .sources.fallback import get_fallback_ipos
 from .emailer import send_email, format_html_email
-
-
-def check_email_config():
-    """Check if email configuration is available and provide helpful error message if not."""
-    # Check for Microsoft Graph credentials
-    has_graph = all([
-        os.getenv('CLIENT_ID'),
-        os.getenv('CLIENT_SECRET'), 
-        os.getenv('TENANT_ID')
-    ])
-    
-    # Check for SMTP credentials
-    has_smtp = all([
-        os.getenv('SENDER_EMAIL') or os.getenv('OUTLOOK_EMAIL'),
-        os.getenv('SENDER_PASSWORD') or os.getenv('OUTLOOK_APP_PASSWORD')
-    ])
-    
-    if not has_graph and not has_smtp:
-        print("\n❌ No email configuration found!")
-        print("\nTo make this work, you need either:")
-        print("\n1. SMTP (Outlook) credentials:")
-        print("   SENDER_EMAIL=your_outlook_email@example.com")
-        print("   SENDER_PASSWORD=your_outlook_app_password")
-        print("   RECIPIENT_EMAIL=recipient@example.com")
-        print("\n2. OR Microsoft Graph API credentials:")
-        print("   CLIENT_ID=your_azure_app_client_id")
-        print("   CLIENT_SECRET=your_azure_app_client_secret") 
-        print("   TENANT_ID=your_azure_tenant_id")
-        print("   SENDER_EMAIL=your_outlook_email@example.com")
-        print("   RECIPIENT_EMAIL=recipient@example.com")
-        print("\n💡 Create a .env file in the repo root with these variables.")
-        print("   See README.md for detailed setup instructions.")
-        return False
-    
-    return True
 
 
 def handler(dry_run=False):
