@@ -1,4 +1,4 @@
-# IPO Reminder Bot
+# IPO Reminder
 
 Daily **8:30 AM IST** cloud job that emails you IPOs **closing today** with a clear **Apply / Avoid** suggestion and details (price band, lot size, GMP trend, expert view).
 
