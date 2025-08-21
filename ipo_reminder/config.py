@@ -24,17 +24,19 @@ SENDER_EMAIL = os.getenv("SENDER_EMAIL") or os.getenv("OUTLOOK_EMAIL")
 SENDER_PASSWORD = os.getenv("SENDER_PASSWORD") or os.getenv("OUTLOOK_APP_PASSWORD")
 RECIPIENT_EMAIL = os.getenv("RECIPIENT_EMAIL", SENDER_EMAIL)
 
-# Validate required configuration
-if not all([SENDER_EMAIL, SENDER_PASSWORD]):
-    raise ValueError(
-        "Missing required email configuration.\n"
-        "Please set the following environment variables in your .env file:\n"
-        "1. SENDER_EMAIL: Your Outlook email address\n"
-        "2. SENDER_PASSWORD: Your Outlook App Password\n\n"
-        "Note: If you're using 2FA, you'll need to create an App Password at:\n"
-        "https://account.microsoft.com/security\n"
-        "(Go to Security > More security options > Create a new app password)"
-    )
+
+def validate_email_config() -> None:
+    """Raise if required email config is missing. Call this at runtime when sending email."""
+    if not all([SENDER_EMAIL, SENDER_PASSWORD]):
+        raise ValueError(
+            "Missing required email configuration.\n"
+            "Please set the following environment variables in your environment or .env file:\n"
+            "1. SENDER_EMAIL: Your Outlook email address\n"
+            "2. SENDER_PASSWORD: Your Outlook App Password\n\n"
+            "Note: If you're using 2FA, you'll need to create an App Password at:\n"
+            "https://account.microsoft.com/security\n"
+            "(Go to Security > More security options > Create a new app password)"
+        )
 
 # Web Scraping Configuration
 BASE_URL = "https://www.chittorgarh.com"

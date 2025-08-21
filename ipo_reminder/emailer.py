@@ -5,8 +5,10 @@ import json
 import time
 import requests
 import msal
+import smtplib
+from email.message import EmailMessage
 from typing import List, Optional
-from .config import SENDER_EMAIL, RECIPIENT_EMAIL
+from .config import SENDER_EMAIL, RECIPIENT_EMAIL, validate_email_config
 
 # Microsoft Graph API Configuration
 CLIENT_ID = os.getenv('CLIENT_ID')
@@ -51,6 +53,44 @@ def get_access_token():
         logger.error(error_msg)
         raise EmailError(error_msg)
 
+
+def _send_via_smtp(subject: str, body: str, html_body: Optional[str], recipients: List[str]) -> bool:
+    """Send email using SMTP (Outlook/Office365) as fallback."""
+    smtp_server = os.getenv('SMTP_SERVER', 'smtp.office365.com')
+    smtp_port = int(os.getenv('SMTP_PORT', '587'))
+    sender = os.getenv('SENDER_EMAIL')
+    password = os.getenv('SENDER_PASSWORD')
+
+    if not sender or not password:
+        logger.error("SMTP fallback configured but SENDER_EMAIL or SENDER_PASSWORD is missing")
+        return False
+
+    msg = EmailMessage()
+    msg['Subject'] = subject
+    msg['From'] = sender
+    msg['To'] = ', '.join(recipients)
+    if html_body and html_body.strip():
+        msg.set_content(body)
+        msg.add_alternative(html_body, subtype='html')
+    else:
+        msg.set_content(body)
+
+    try:
+        # Validate email config before attempting SMTP send
+        validate_email_config()
+        with smtplib.SMTP(smtp_server, smtp_port, timeout=30) as s:
+            s.ehlo()
+            if smtp_port == 587:
+                s.starttls()
+                s.ehlo()
+            s.login(sender, password)
+            s.send_message(msg)
+        logger.info(f"Email sent via SMTP to {', '.join(recipients)}")
+        return True
+    except Exception as e:
+        logger.error(f"SMTP send failed: {e}")
+        return False
+
 def send_email(
     subject: str,
     body: str,
@@ -89,63 +129,68 @@ def send_email(
         "saveToSentItems": "true"
     }
     
-    access_token = None
-    for attempt in range(1, max_retries + 1):
-        try:
-            # Get a fresh access token for each attempt
-            access_token = get_access_token()
-            
-            # Send the email using Microsoft Graph API
-            headers = {
-                'Authorization': f'Bearer {access_token}',
-                'Content-Type': 'application/json'
-            }
-            
-            response = requests.post(
-                f"{GRAPH_ENDPOINT}/users/{SENDER_EMAIL}/sendMail",
-                headers=headers,
-                json=email_msg,
-                timeout=30
-            )
-            
-            # Check for rate limiting (HTTP 429)
-            if response.status_code == 429:
-                retry_after = int(response.headers.get('Retry-After', retry_delay))
-                logger.warning(f"Rate limited. Retrying after {retry_after} seconds...")
-                time.sleep(retry_after)
-                continue
-                
-            # Check for authentication errors
-            if response.status_code == 401:
-                logger.warning("Authentication expired. Refreshing token...")
+    # If Graph credentials are present, use Microsoft Graph API; otherwise use SMTP fallback
+    if CLIENT_ID and CLIENT_SECRET:
+        access_token = None
+        for attempt in range(1, max_retries + 1):
+            try:
+                # Get a fresh access token for each attempt
                 access_token = get_access_token()
-                continue
                 
-            response.raise_for_status()
-            logger.info(f"Email sent successfully to {', '.join(recipients)}")
-            return True
-            
-        except requests.exceptions.RequestException as e:
-            error_msg = f"Error sending email (attempt {attempt}/{max_retries}): {str(e)}"
-            if hasattr(e, 'response') and e.response is not None:
-                try:
-                    error_details = e.response.json()
-                    error_msg += f"\nResponse: {json.dumps(error_details, indent=2)}"
-                except:
-                    error_msg += f"\nResponse: {e.response.text}"
-            
-            logger.warning(error_msg)
-            
-            if attempt < max_retries:
-                # Exponential backoff
-                wait_time = retry_delay * (2 ** (attempt - 1))
-                logger.warning(f"Retrying in {wait_time} seconds...")
-                time.sleep(wait_time)
-            else:
-                logger.error(f"Failed to send email after {max_retries} attempts")
-                return False
-    
-    return False
+                # Send the email using Microsoft Graph API
+                headers = {
+                    'Authorization': f'Bearer {access_token}',
+                    'Content-Type': 'application/json'
+                }
+                
+                response = requests.post(
+                    f"{GRAPH_ENDPOINT}/users/{SENDER_EMAIL}/sendMail",
+                    headers=headers,
+                    json=email_msg,
+                    timeout=30
+                )
+                
+                # Check for rate limiting (HTTP 429)
+                if response.status_code == 429:
+                    retry_after = int(response.headers.get('Retry-After', retry_delay))
+                    logger.warning(f"Rate limited. Retrying after {retry_after} seconds...")
+                    time.sleep(retry_after)
+                    continue
+                    
+                # Check for authentication errors
+                if response.status_code == 401:
+                    logger.warning("Authentication expired. Refreshing token...")
+                    access_token = get_access_token()
+                    continue
+                    
+                response.raise_for_status()
+                logger.info(f"Email sent successfully to {', '.join(recipients)} via Microsoft Graph")
+                return True
+                
+            except requests.exceptions.RequestException as e:
+                error_msg = f"Error sending email (attempt {attempt}/{max_retries}): {str(e)}"
+                if hasattr(e, 'response') and e.response is not None:
+                    try:
+                        error_details = e.response.json()
+                        error_msg += f"\nResponse: {json.dumps(error_details, indent=2)}"
+                    except:
+                        error_msg += f"\nResponse: {e.response.text}"
+                
+                logger.warning(error_msg)
+                
+                if attempt < max_retries:
+                    # Exponential backoff
+                    wait_time = retry_delay * (2 ** (attempt - 1))
+                    logger.warning(f"Retrying in {wait_time} seconds...")
+                    time.sleep(wait_time)
+                else:
+                    logger.error(f"Failed to send email after {max_retries} attempts using Graph API")
+                    return False
+        
+        return False
+    else:
+        logger.info("Graph credentials not found; using SMTP fallback")
+        return _send_via_smtp(subject, body, html_body, recipients)
 
 def format_html_email(ipos: list, now_date: str) -> str:
     """Format IPO information as an HTML email."""
