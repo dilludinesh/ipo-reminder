@@ -76,7 +76,7 @@ def send_email(
     if not recipients:
         recipients = [RECIPIENT_EMAIL]
     
-    # Prepare the email message
+    # Prepare the email message (do not include 'from' field, Graph API infers sender from token)
     email_msg = {
         "message": {
             "subject": subject,
@@ -84,12 +84,7 @@ def send_email(
                 "contentType": "HTML" if (html_body and html_body.strip()) else "Text",
                 "content": html_body if (html_body and html_body.strip()) else body
             },
-            "toRecipients": [{"emailAddress": {"address": addr}} for addr in recipients],
-            "from": {
-                "emailAddress": {
-                    "address": SENDER_EMAIL
-                }
-            }
+            "toRecipients": [{"emailAddress": {"address": addr}} for addr in recipients]
         },
         "saveToSentItems": "true"
     }
