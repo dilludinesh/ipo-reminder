@@ -108,3 +108,17 @@ pre-commit install
 ```
 
 This will block accidental commits of `.env` or common secret patterns.
+
+Automate setting GitHub secrets (optional)
+
+If you use the GitHub CLI (`gh`), there's a helper script to set the required repository secrets:
+
+```bash
+# make it executable once
+chmod +x scripts/set_github_secrets.sh
+# then run (replace owner/repo)
+CLIENT_ID=... CLIENT_SECRET=... TENANT_ID=... OUTLOOK_EMAIL=... OUTLOOK_APP_PASSWORD=... RECIPIENT_EMAIL=... \
+  ./scripts/set_github_secrets.sh dilludinesh/ipo-reminder-bot
+```
+
+This will push the secrets to GitHub Actions securely.
