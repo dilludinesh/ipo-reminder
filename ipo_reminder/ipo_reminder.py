@@ -16,7 +16,7 @@ def handler(dry_run=False):
         sys.exit(1)
     
     # Use IST calendar date for "today"
-    now_utc = dt.datetime.utcnow()
+    now_utc = dt.datetime.now(dt.timezone.utc)
     # IST = UTC+5:30
     ist = now_utc + dt.timedelta(hours=5, minutes=30)
     today = ist.date()
@@ -48,4 +48,3 @@ if __name__ == "__main__":
     # Support --dry-run flag for testing
     dry_run = "--dry-run" in sys.argv
     handler(dry_run=dry_run)
-    handler()
