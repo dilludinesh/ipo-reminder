@@ -107,106 +107,10 @@ def get_nse_ipos() -> List[IPOInfo]:
     
     return []
 
-def get_manual_ipo_data(target_date) -> List[IPOInfo]:
-    """Return manually curated IPO data for testing when scrapers fail."""
-    
-    # Convert target_date to date object if it's a string
-    if isinstance(target_date, str):
-        target_date_obj = datetime.strptime(target_date, '%Y-%m-%d').date()
-    else:
-        target_date_obj = target_date
-    
-    # Manual IPO data for August 22, 2025 (updated for current date)
-    manual_data = [
-        {
-            'name': 'Patel Retail Ltd',
-            'open_date': 'Aug 19, 2025',
-            'close_date': 'Aug 22, 2025',
-            'price_band': '₹120-130',
-            'lot_size': '100',
-            'issue_size': '₹500 Cr',
-            'recommendation': 'SUBSCRIBE',
-            'recommendation_reason': 'Strong fundamentals and good growth prospects'
-        },
-        {
-            'name': 'Vikram Solar Ltd',
-            'open_date': 'Aug 20, 2025', 
-            'close_date': 'Aug 22, 2025',
-            'price_band': '₹85-95',
-            'lot_size': '150',
-            'issue_size': '₹300 Cr',
-            'recommendation': 'APPLY',
-            'recommendation_reason': 'Leading solar company with strong order book'
-        },
-        {
-            'name': 'Gem Aromatics Ltd',
-            'open_date': 'Aug 20, 2025',
-            'close_date': 'Aug 22, 2025', 
-            'price_band': '₹45-55',
-            'lot_size': '200',
-            'issue_size': '₹150 Cr',
-            'recommendation': 'NEUTRAL',
-            'recommendation_reason': 'Small company but good niche market'
-        },
-        {
-            'name': 'Shreeji Shipping Global Ltd',
-            'open_date': 'Aug 19, 2025',
-            'close_date': 'Aug 22, 2025',
-            'price_band': '₹200-220',
-            'lot_size': '50',
-            'issue_size': '₹800 Cr',
-            'recommendation': 'SUBSCRIBE',
-            'recommendation_reason': 'Maritime logistics leader with global presence'
-        }
-    ]
-    
-    logger.info(f"Looking for IPOs closing on {target_date_obj}")
-    
-    matching_ipos = []
-    for ipo_data in manual_data:
-        close_date_str = ipo_data['close_date'].replace(',', '')  # Remove comma for parsing
-        try:
-            # Parse the close date
-            close_date_obj = datetime.strptime(close_date_str, '%b %d %Y').date()
-            open_date_obj = None
-            try:
-                open_date_str = ipo_data['open_date'].replace(',', '')
-                open_date_obj = datetime.strptime(open_date_str, '%b %d %Y').date()
-            except:
-                pass
-            
-            if close_date_obj == target_date_obj:
-                ipo = IPOInfo(
-                    name=ipo_data['name'],
-                    detail_url=None,
-                    gmp_url=None,
-                    open_date=open_date_obj,
-                    close_date=close_date_obj,
-                    price_band=ipo_data['price_band'],
-                    lot_size=ipo_data['lot_size'],
-                    issue_size=ipo_data['issue_size']
-                )
-                # Add recommendation if available
-                if 'recommendation' in ipo_data:
-                    ipo.recommendation = ipo_data['recommendation']
-                    ipo.recommendation_reason = ipo_data['recommendation_reason']
-                matching_ipos.append(ipo)
-                logger.info(f"Found matching IPO: {ipo.name}")
-        except ValueError as e:
-            logger.warning(f"Could not parse date for {ipo_data['name']}: {e}")
-    
-    logger.info(f"Found {len(matching_ipos)} IPOs from manual data closing on {target_date_obj}")
-    return matching_ipos
-
 def get_fallback_ipos(target_date: date) -> List[IPOInfo]:
     """Get IPO data from alternative sources when main scraper fails."""
     
     logger.info("Trying alternative IPO data sources...")
-    
-    # Try manual data first
-    ipos = get_manual_ipo_data(target_date)
-    if ipos:
-        return ipos
     
     # Try other sources
     all_ipos = []

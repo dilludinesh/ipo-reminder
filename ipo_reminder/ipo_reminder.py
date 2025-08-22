@@ -4,6 +4,8 @@ import sys
 import os
 from .config import check_email_config
 from .sources.chittorgarh import today_ipos_closing, format_email
+from .sources.official import get_official_ipos
+from .sources.moneycontrol import get_moneycontrol_ipos
 from .sources.fallback import get_fallback_ipos
 from .emailer import send_email, format_html_email
 
@@ -21,13 +23,25 @@ def handler(dry_run=False):
     ist = now_utc + dt.timedelta(hours=5, minutes=30)
     today = ist.date()
 
-    # Try primary source first
-    ipos = today_ipos_closing(today)
-    logger.info(f"Found {len(ipos)} IPO(s) closing today from primary source.")
+    # Try official sources first (SEBI, BSE, NSE) - most authoritative
+    ipos = get_official_ipos(today)
+    logger.info(f"Found {len(ipos)} IPO(s) closing today from official sources.")
     
-    # If no IPOs found, try fallback sources
+    # If no IPOs found, try Moneycontrol (reliable financial portal)
     if not ipos:
-        logger.info("No IPOs found from primary source, trying fallback sources...")
+        logger.info("No IPOs found from official sources, trying Moneycontrol...")
+        ipos = get_moneycontrol_ipos(today)
+        logger.info(f"Found {len(ipos)} IPO(s) closing today from Moneycontrol.")
+    
+    # If still no IPOs, try Chittorgarh as backup
+    if not ipos:
+        logger.info("No IPOs found from Moneycontrol, trying Chittorgarh...")
+        ipos = today_ipos_closing(today)
+        logger.info(f"Found {len(ipos)} IPO(s) closing today from Chittorgarh.")
+    
+    # If still no IPOs, try other fallback sources
+    if not ipos:
+        logger.info("No IPOs found from Chittorgarh, trying other fallback sources...")
         ipos = get_fallback_ipos(today)
         logger.info(f"Found {len(ipos)} IPO(s) closing today from fallback sources.")
     

@@ -294,8 +294,19 @@ def get_upcoming_ipos() -> List[IPOInfo]:
     result = []
     for row in ipos:
         try:
+            # Detect if this is an SME IPO based on name or other indicators
+            name = row.get("name", "")
+            platform = "Mainboard"
+            
+            # Check for SME indicators in the name or other fields
+            if any(term in name.lower() for term in ['sme', 'emerge', 'small', 'medium']):
+                platform = "SME"
+            
+            # Add platform information to name if it's SME
+            enhanced_name = f"{name} ({platform})" if platform == "SME" else name
+            
             ipo = IPOInfo(
-                name=row.get("name"),
+                name=enhanced_name,
                 detail_url=row.get("detail_url"),
                 gmp_url=row.get("gmp_url"),
                 open_date=row.get("open_date"),
@@ -455,83 +466,152 @@ def decide_apply_avoid(ipo: IPOInfo) -> Tuple[str, str]:
     return "NEUTRAL ⚖", "Mixed/insufficient data; apply only if thesis fits"
 
 def format_email(now_date: date, ipos: List[IPOInfo]) -> Tuple[str, str]:
+    """Format email with personalized IPO recommendations for Dinesh."""
+    from ..advisor import get_personalized_recommendations
+    
     # Create consistent subject line with bot name, date and day
     day_name = now_date.strftime('%A')  # Full day name (Monday, Tuesday, etc.)
     formatted_date = now_date.strftime('%d %b %Y')  # 22 Aug 2025
     subject = f"IPO Reminder Bot • {day_name}, {formatted_date}"
     
     if not ipos:
-        # Start with compelling preview text
-        body = f"""🏖️ No IPOs closing today - Enjoy your relaxed day!
+        # Simple preview text
+        body = f"""No IPOs closing today - All clear!
 
-🌟 IPO REMINDER • {now_date.strftime('%d %b %Y').upper()} 🌟
-═══════════════════════════════════════════
+IPO Reminder for {formatted_date}
 
-Hello Dinesh! 👋
+Hello Dinesh,
 
-🎯 STATUS UPDATE: All Clear Today!
 No IPOs are closing today ({now_date.strftime('%d-%b-%Y')}).
 
-🏖️ Enjoy your IPO-free day! Time to relax or research upcoming opportunities.
+Your investment portfolio remains focused. Use this time to research upcoming opportunities.
 
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-🤖 IPO Reminder Bot • Keeping you informed daily!
+Regards,
+IPO Reminder Bot 🤖
 """
         return subject, body
     
-    # Count recommendations for dynamic preview text
-    apply_count = sum(1 for ipo in ipos if hasattr(ipo, 'recommendation') and 'APPLY' in str(ipo.recommendation or ''))
+    # Get personalized recommendations
+    recommendations = get_personalized_recommendations(ipos)
     
-    if apply_count > 0:
-        # Create compelling preview for hot IPOs
-        hot_companies = [ipo.name for ipo in ipos if hasattr(ipo, 'recommendation') and 'APPLY' in str(ipo.recommendation or '')][:2]
-        if len(hot_companies) == 1:
-            preview = f"🔥 HOT: {hot_companies[0]} - Don't miss out!"
-        else:
-            preview = f"🔥 {apply_count} HOT IPOs including {hot_companies[0]} - Act fast!"
+    # Count strong recommendations
+    strong_buy_count = sum(1 for rec in recommendations if rec.recommendation == 'STRONG BUY')
+    buy_count = sum(1 for rec in recommendations if rec.recommendation == 'BUY')
+    apply_count = sum(1 for rec in recommendations if rec.recommendation == 'APPLY')
+    
+    # Create dynamic preview based on recommendations
+    if strong_buy_count > 0:
+        top_pick = next(rec for rec in recommendations if rec.recommendation == 'STRONG BUY')
+        preview = f"🚀 STRONG BUY: {top_pick.ipo.name.split('(')[0].strip()} - Must apply!"
+    elif buy_count > 0:
+        top_pick = next(rec for rec in recommendations if rec.recommendation == 'BUY')
+        preview = f"💎 BUY: {top_pick.ipo.name.split('(')[0].strip()} - Recommended"
+    elif apply_count > 0:
+        top_pick = next(rec for rec in recommendations if rec.recommendation == 'APPLY')
+        preview = f"✅ APPLY: {top_pick.ipo.name.split('(')[0].strip()} - Worth considering"
     else:
-        # Create preview for regular IPOs
-        company_names = [ipo.name for ipo in ipos[:2]]
-        if len(ipos) == 1:
-            preview = f"📊 {company_names[0]} closes today - Check details inside"
-        else:
-            preview = f"📊 {len(ipos)} IPOs including {company_names[0]} close today"
+        preview = f"{len(ipos)} IPO{'s' if len(ipos) > 1 else ''} closing today - Analysis inside"
     
+    # Build email body with personalized recommendations
     lines = [f"""{preview}
 
-🚀 IPO REMINDER • {now_date.strftime('%d %b %Y').upper()} 🚀
-═══════════════════════════════════════════
+🎯 Personal IPO Analysis for {formatted_date}
 
-Hello Dinesh! 👋
+Hello Dinesh,
 
-⏰ LAST DAY ALERT: {len(ipos)} IPO{'s' if len(ipos) > 1 else ''} closing today ({now_date.strftime('%d-%b-%Y')}):
+{len(ipos)} IPO{'s' if len(ipos) > 1 else ''} closing today. Here's my personalized investment analysis for you:
 
 """]
-    for ipo in ipos:
-        rec, reason = decide_apply_avoid(ipo)
-        
-        # Add emoji based on recommendation
-        if 'APPLY' in rec:
-            ipo_emoji = '🔥'
-        elif 'AVOID' in rec:
-            ipo_emoji = '⚠️'
-        else:
-            ipo_emoji = '📈'
-            
-        lines.append(f"{ipo_emoji} {ipo.name}")
-        lines.append(f"   ┌─ 💰 Price Band: {ipo.price_band or 'Not specified'}")
-        if ipo.lot_size: lines.append(f"   ├─ 📦 Lot Size: {ipo.lot_size}")
-        if ipo.issue_size: lines.append(f"   ├─ 💼 Issue Size: {ipo.issue_size}")
-        if ipo.gmp_latest: lines.append(f"   ├─ 📊 GMP: {ipo.gmp_latest} ({ipo.gmp_trend or 'unknown'})")
-        if ipo.expert_recommendation: lines.append(f"   ├─ 👨‍💼 Expert View: {ipo.expert_recommendation}")
-        lines.append(f"   ├─ 🤖 Bot Suggestion: {rec}")
-        lines.append(f"   ├─ 💡 Reason: {reason}")
-        if ipo.detail_url: lines.append(f"   ├─ 🔗 Details: {ipo.detail_url}")
-        if ipo.gmp_url: lines.append(f"   ├─ 📊 GMP Page: {ipo.gmp_url}")
-        if ipo.close_date: lines.append(f"   └─ ⏰ Close Date: {ipo.close_date.strftime('%d-%b-%Y')}")
-        lines.append("")
     
-    lines.append("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
-    lines.append("⚠️  DISCLAIMER: Suggestions are informational, not financial advice.")
-    lines.append("🤖 IPO Reminder Bot • Keeping you informed daily!")
+    # Group recommendations by strength
+    strong_recommendations = [rec for rec in recommendations if rec.recommendation in ['STRONG BUY', 'BUY']]
+    moderate_recommendations = [rec for rec in recommendations if rec.recommendation == 'APPLY']
+    weak_recommendations = [rec for rec in recommendations if rec.recommendation in ['NEUTRAL', 'AVOID']]
+    
+    # Strong recommendations first
+    if strong_recommendations:
+        lines.append("🚀 TOP PICKS FOR YOU:")
+        lines.append("=" * 30)
+        for rec in strong_recommendations:
+            lines.append(f"\n📈 {rec.ipo.name}")
+            lines.append(f"   💰 My Recommendation: {rec.recommendation}")
+            lines.append(f"   🎯 Suggested Investment: {rec.investment_amount}")
+            lines.append(f"   📊 Confidence Level: {rec.confidence:.0%}")
+            lines.append(f"   ⚠️  Risk Level: {rec.risk_level}")
+            
+            if rec.ipo.price_band:
+                lines.append(f"   💵 Price Band: {rec.ipo.price_band}")
+            if rec.ipo.issue_size:
+                lines.append(f"   📋 Issue Size: {rec.ipo.issue_size}")
+            
+            lines.append(f"   🧠 Why I recommend this:")
+            for reason in rec.reasoning[:3]:  # Top 3 reasons
+                lines.append(f"      • {reason}")
+            
+            if rec.ipo.close_date:
+                lines.append(f"   ⏰ Closes: {rec.ipo.close_date.strftime('%d-%b-%Y')}")
+            if rec.ipo.detail_url:
+                lines.append(f"   🔗 Details: {rec.ipo.detail_url}")
+            lines.append("")
+    
+    # Moderate recommendations
+    if moderate_recommendations:
+        lines.append("✅ WORTH CONSIDERING:")
+        lines.append("=" * 25)
+        for rec in moderate_recommendations:
+            lines.append(f"\n📊 {rec.ipo.name}")
+            lines.append(f"   💰 My Recommendation: {rec.recommendation}")
+            lines.append(f"   🎯 Suggested Investment: {rec.investment_amount}")
+            lines.append(f"   📊 Confidence Level: {rec.confidence:.0%}")
+            
+            if rec.ipo.price_band:
+                lines.append(f"   💵 Price Band: {rec.ipo.price_band}")
+            
+            lines.append(f"   🧠 Key points:")
+            for reason in rec.reasoning[:2]:  # Top 2 reasons
+                lines.append(f"      • {reason}")
+            lines.append("")
+    
+    # Weak recommendations (brief)
+    if weak_recommendations:
+        lines.append("⚠️ NOT RECOMMENDED FOR YOU:")
+        lines.append("=" * 30)
+        for rec in weak_recommendations:
+            lines.append(f"❌ {rec.ipo.name} - {rec.recommendation}")
+            lines.append(f"   Reason: {rec.reasoning[0] if rec.reasoning else 'Does not match your investment criteria'}")
+            lines.append("")
+    
+    # Personal summary
+    lines.append("💡 PERSONAL INVESTMENT SUMMARY:")
+    lines.append("=" * 35)
+    
+    total_recommended_amount = 0
+    recommended_ipos = [rec for rec in recommendations if rec.recommendation in ['STRONG BUY', 'BUY', 'APPLY']]
+    
+    if recommended_ipos:
+        lines.append(f"📈 {len(recommended_ipos)} IPO{'s' if len(recommended_ipos) > 1 else ''} recommended for your portfolio")
+        lines.append(f"💰 Total suggested investment range: ₹{len(recommended_ipos) * 10000:,} - ₹{len(recommended_ipos) * 30000:,}")
+        lines.append("")
+        lines.append("🎯 Action items for today:")
+        for i, rec in enumerate(recommended_ipos[:3], 1):  # Top 3 actions
+            company_name = rec.ipo.name.split('(')[0].strip()
+            lines.append(f"   {i}. Apply for {company_name} - {rec.recommendation}")
+    else:
+        lines.append("🛑 No IPOs meet your investment criteria today")
+        lines.append("💡 Consider waiting for better opportunities that match your profile")
+    
+    lines.append("")
+    lines.append("📋 Remember: This analysis is based on your personal investment preferences:")
+    lines.append("   • Preferred sectors: Technology, Healthcare, Finance")
+    lines.append("   • Risk tolerance: Medium")
+    lines.append("   • Investment horizon: Long-term")
+    lines.append("")
+    lines.append("⚠️  Disclaimer: This is personalized analysis, not financial advice.")
+    lines.append("    Always do your own research before investing.")
+    lines.append("")
+    lines.append("Regards,")
+    lines.append("Your Personal IPO Advisor 🤖")
+    
+    body = "\n".join(lines)
+    return subject, body
     return subject, "\n".join(lines)
