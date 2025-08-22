@@ -455,9 +455,12 @@ def decide_apply_avoid(ipo: IPOInfo) -> Tuple[str, str]:
     return "NEUTRAL ⚖", "Mixed/insufficient data; apply only if thesis fits"
 
 def format_email(now_date: date, ipos: List[IPOInfo]) -> Tuple[str, str]:
-    # Create more engaging subject lines
+    # Create consistent subject line with bot name, date and day
+    day_name = now_date.strftime('%A')  # Full day name (Monday, Tuesday, etc.)
+    formatted_date = now_date.strftime('%d %b %Y')  # 22 Aug 2025
+    subject = f"IPO Reminder Bot • {day_name}, {formatted_date}"
+    
     if not ipos:
-        subject = f"📊 IPO Alert: All Clear! • {now_date.strftime('%d %b %Y')}"
         # Start with compelling preview text
         body = f"""🏖️ No IPOs closing today - Enjoy your relaxed day!
 
@@ -476,11 +479,10 @@ No IPOs are closing today ({now_date.strftime('%d-%b-%Y')}).
 """
         return subject, body
     
-    # Count recommendations for dynamic subject
+    # Count recommendations for dynamic preview text
     apply_count = sum(1 for ipo in ipos if hasattr(ipo, 'recommendation') and 'APPLY' in str(ipo.recommendation or ''))
     
     if apply_count > 0:
-        subject = f"🚨 {apply_count} HOT IPO{'S' if apply_count > 1 else ''} CLOSING! • {now_date.strftime('%d %b')}"
         # Create compelling preview for hot IPOs
         hot_companies = [ipo.name for ipo in ipos if hasattr(ipo, 'recommendation') and 'APPLY' in str(ipo.recommendation or '')][:2]
         if len(hot_companies) == 1:
@@ -488,7 +490,6 @@ No IPOs are closing today ({now_date.strftime('%d-%b-%Y')}).
         else:
             preview = f"🔥 {apply_count} HOT IPOs including {hot_companies[0]} - Act fast!"
     else:
-        subject = f"📊 {len(ipos)} IPO{'S' if len(ipos) > 1 else ''} Closing Today • {now_date.strftime('%d %b')}"
         # Create preview for regular IPOs
         company_names = [ipo.name for ipo in ipos[:2]]
         if len(ipos) == 1:

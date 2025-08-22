@@ -68,7 +68,8 @@ def _send_via_smtp(subject: str, body: str, html_body: Optional[str], recipients
 
     msg = EmailMessage()
     msg['Subject'] = subject
-    msg['From'] = sender
+    # Set friendly display name for the sender
+    msg['From'] = f"IPO Reminder Bot 🤖 <{sender}>"
     msg['To'] = ', '.join(recipients)
     if html_body and html_body.strip():
         msg.set_content(body)
@@ -122,6 +123,12 @@ def send_email(
                 "content": html_body if (html_body and html_body.strip()) else body,
             },
             "toRecipients": [{"emailAddress": {"address": addr}} for addr in recipients],
+            "from": {
+                "emailAddress": {
+                    "address": SENDER_EMAIL,
+                    "name": "IPO Reminder Bot 🤖"
+                }
+            }
         },
         "saveToSentItems": "true",
     }
