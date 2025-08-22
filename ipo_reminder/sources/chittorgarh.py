@@ -455,24 +455,82 @@ def decide_apply_avoid(ipo: IPOInfo) -> Tuple[str, str]:
     return "NEUTRAL ⚖", "Mixed/insufficient data; apply only if thesis fits"
 
 def format_email(now_date: date, ipos: List[IPOInfo]) -> Tuple[str, str]:
-    subject = f"IPO Reminder – {now_date.strftime('%d %b %Y')} (Last-day alerts)"
+    # Create more engaging subject lines
     if not ipos:
-        body = f"Hello 👋\n\nNo IPOs are closing today ({now_date.strftime('%d-%b-%Y')}).\n\n— IPO Reminder Bot"
+        subject = f"📊 IPO Alert: All Clear! • {now_date.strftime('%d %b %Y')}"
+        # Start with compelling preview text
+        body = f"""🏖️ No IPOs closing today - Enjoy your relaxed day!
+
+🌟 IPO REMINDER • {now_date.strftime('%d %b %Y').upper()} 🌟
+═══════════════════════════════════════════
+
+Hello Dinesh! 👋
+
+🎯 STATUS UPDATE: All Clear Today!
+No IPOs are closing today ({now_date.strftime('%d-%b-%Y')}).
+
+🏖️ Enjoy your IPO-free day! Time to relax or research upcoming opportunities.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🤖 IPO Reminder Bot • Keeping you informed daily!
+"""
         return subject, body
-    lines = [f"Hello 👋\n\nThese IPO(s) close today ({now_date.strftime('%d-%b-%Y')}):\n"]
+    
+    # Count recommendations for dynamic subject
+    apply_count = sum(1 for ipo in ipos if hasattr(ipo, 'recommendation') and 'APPLY' in str(ipo.recommendation or ''))
+    
+    if apply_count > 0:
+        subject = f"🚨 {apply_count} HOT IPO{'S' if apply_count > 1 else ''} CLOSING! • {now_date.strftime('%d %b')}"
+        # Create compelling preview for hot IPOs
+        hot_companies = [ipo.name for ipo in ipos if hasattr(ipo, 'recommendation') and 'APPLY' in str(ipo.recommendation or '')][:2]
+        if len(hot_companies) == 1:
+            preview = f"🔥 HOT: {hot_companies[0]} - Don't miss out!"
+        else:
+            preview = f"🔥 {apply_count} HOT IPOs including {hot_companies[0]} - Act fast!"
+    else:
+        subject = f"📊 {len(ipos)} IPO{'S' if len(ipos) > 1 else ''} Closing Today • {now_date.strftime('%d %b')}"
+        # Create preview for regular IPOs
+        company_names = [ipo.name for ipo in ipos[:2]]
+        if len(ipos) == 1:
+            preview = f"📊 {company_names[0]} closes today - Check details inside"
+        else:
+            preview = f"📊 {len(ipos)} IPOs including {company_names[0]} close today"
+    
+    lines = [f"""{preview}
+
+🚀 IPO REMINDER • {now_date.strftime('%d %b %Y').upper()} 🚀
+═══════════════════════════════════════════
+
+Hello Dinesh! 👋
+
+⏰ LAST DAY ALERT: {len(ipos)} IPO{'s' if len(ipos) > 1 else ''} closing today ({now_date.strftime('%d-%b-%Y')}):
+
+"""]
     for ipo in ipos:
         rec, reason = decide_apply_avoid(ipo)
-        lines.append(f"• {ipo.name}")
-        if ipo.price_band: lines.append(f"  - Price Band: {ipo.price_band}")
-        if ipo.lot_size: lines.append(f"  - Lot Size: {ipo.lot_size}")
-        if ipo.issue_size: lines.append(f"  - Issue Size: {ipo.issue_size}")
-        if ipo.gmp_latest: lines.append(f"  - GMP: {ipo.gmp_latest} ({ipo.gmp_trend or 'unknown'})")
-        if ipo.expert_recommendation: lines.append(f"  - Expert View: {ipo.expert_recommendation}")
-        lines.append(f"  - Bot Suggestion: {rec}")
-        lines.append(f"  - Reason: {reason}")
-        if ipo.detail_url: lines.append(f"  - Details: {ipo.detail_url}")
-        if ipo.gmp_url: lines.append(f"  - GMP Page: {ipo.gmp_url}")
-        if ipo.close_date: lines.append(f"  - Close Date: {ipo.close_date.strftime('%d-%b-%Y')}")
+        
+        # Add emoji based on recommendation
+        if 'APPLY' in rec:
+            ipo_emoji = '🔥'
+        elif 'AVOID' in rec:
+            ipo_emoji = '⚠️'
+        else:
+            ipo_emoji = '📈'
+            
+        lines.append(f"{ipo_emoji} {ipo.name}")
+        lines.append(f"   ┌─ 💰 Price Band: {ipo.price_band or 'Not specified'}")
+        if ipo.lot_size: lines.append(f"   ├─ 📦 Lot Size: {ipo.lot_size}")
+        if ipo.issue_size: lines.append(f"   ├─ 💼 Issue Size: {ipo.issue_size}")
+        if ipo.gmp_latest: lines.append(f"   ├─ 📊 GMP: {ipo.gmp_latest} ({ipo.gmp_trend or 'unknown'})")
+        if ipo.expert_recommendation: lines.append(f"   ├─ 👨‍💼 Expert View: {ipo.expert_recommendation}")
+        lines.append(f"   ├─ 🤖 Bot Suggestion: {rec}")
+        lines.append(f"   ├─ 💡 Reason: {reason}")
+        if ipo.detail_url: lines.append(f"   ├─ 🔗 Details: {ipo.detail_url}")
+        if ipo.gmp_url: lines.append(f"   ├─ 📊 GMP Page: {ipo.gmp_url}")
+        if ipo.close_date: lines.append(f"   └─ ⏰ Close Date: {ipo.close_date.strftime('%d-%b-%Y')}")
         lines.append("")
-    lines.append("Note: Suggestions are informational, not financial advice.\n— IPO Reminder Bot")
+    
+    lines.append("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+    lines.append("⚠️  DISCLAIMER: Suggestions are informational, not financial advice.")
+    lines.append("🤖 IPO Reminder Bot • Keeping you informed daily!")
     return subject, "\n".join(lines)
