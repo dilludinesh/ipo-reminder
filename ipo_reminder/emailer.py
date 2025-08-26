@@ -28,6 +28,20 @@ class EmailError(Exception):
     pass
 
 
+def _append_email_log(status: str, recipient: str, subject: str, detail: str = "") -> None:
+    """Append email attempt to log file with timestamp."""
+    try:
+        import os
+        from datetime import datetime
+        os.makedirs("logs", exist_ok=True)
+        timestamp = datetime.utcnow().isoformat() + "Z"
+        log_entry = f"{timestamp}\t{status}\t{recipient}\t{subject}\t{detail}\n"
+        with open("logs/email.log", "a", encoding="utf-8") as f:
+            f.write(log_entry)
+    except Exception as e:
+        logger.warning(f"Failed to write email log: {e}")
+
+
 def get_access_token() -> str:
     """Get an access token using client credentials flow."""
     try:
@@ -56,15 +70,34 @@ def get_access_token() -> str:
 
 
 def _send_via_smtp(subject: str, body: str, html_body: Optional[str], recipients: List[str]) -> bool:
-    """Send email using SMTP (Outlook/Office365) as fallback."""
-    smtp_server = os.getenv('SMTP_SERVER', 'smtp-mail.outlook.com')
-    smtp_port = int(os.getenv('SMTP_PORT', '587'))
+    """Send email using provider-specific SMTP settings with enhanced authentication."""
     sender = os.getenv('SENDER_EMAIL')
     password = os.getenv('SENDER_PASSWORD')
 
     if not sender or not password:
-        logger.error("SMTP fallback configured but SENDER_EMAIL or SENDER_PASSWORD is missing")
+        logger.error("SMTP configured but SENDER_EMAIL or SENDER_PASSWORD is missing")
         return False
+
+    # Provider-specific SMTP settings
+    sender_domain = sender.split('@')[1].lower() if '@' in sender else ''
+    
+    if sender_domain in ['gmail.com', 'googlemail.com']:
+        smtp_server = 'smtp.gmail.com'
+        smtp_port = 587
+        logger.info("Using Gmail SMTP settings")
+    elif sender_domain in ['outlook.com', 'hotmail.com', 'live.com']:
+        smtp_server = 'smtp-mail.outlook.com'
+        smtp_port = 587
+        logger.info("Using Outlook SMTP settings")
+    elif sender_domain in ['yahoo.com', 'ymail.com']:
+        smtp_server = 'smtp.mail.yahoo.com'
+        smtp_port = 587
+        logger.info("Using Yahoo SMTP settings")
+    else:
+        # Use custom settings or defaults
+        smtp_server = os.getenv('SMTP_SERVER', 'smtp-mail.outlook.com')
+        smtp_port = int(os.getenv('SMTP_PORT', '587'))
+        logger.info(f"Using custom SMTP settings: {smtp_server}:{smtp_port}")
 
     msg = EmailMessage()
     msg['Subject'] = subject
@@ -86,9 +119,11 @@ def _send_via_smtp(subject: str, body: str, html_body: Optional[str], recipients
             s.login(sender, password)
             s.send_message(msg)
         logger.info(f"Email sent via SMTP to {', '.join(recipients)}")
+        _append_email_log("SMTP_SENT", recipients[0], subject)
         return True
     except Exception as e:
         logger.error(f"SMTP send failed: {e}")
+        _append_email_log("SMTP_FAILED", recipients[0], subject, str(e))
         return False
 
 
