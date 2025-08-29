@@ -12,7 +12,19 @@ logger = logging.getLogger(__name__)
 
 
 class EmailError(Exception):
-    """Custom exception for em            </div>''')
+    """Custom except                html_parts.append('''
+        </div>
+    </div>
+</body>
+</html>''')html}
+                </div>
+            </div>''')
+    
+    html_parts.append('''
+        </div>
+    </div>
+</body>
+</html>''')     </div>''')
     
     html_parts.append('''
         </div>
