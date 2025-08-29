@@ -7,7 +7,7 @@ from .sources.chittorgarh import today_ipos_closing, format_email
 from .sources.official import get_official_ipos
 from .sources.moneycontrol import get_moneycontrol_ipos
 from .sources.fallback import get_fallback_ipos
-from .emailer import send_email, format_html_email
+from .emailer import send_email
 
 
 def handler(dry_run=False):
