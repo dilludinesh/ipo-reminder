@@ -3,7 +3,6 @@ import os
 import logging
 from typing import Optional
 from pathlib import Path
-from dotenv import load_dotenv
 
 # Configure logging
 logging.basicConfig(
@@ -14,10 +13,6 @@ logging.basicConfig(
     ]
 )
 logger = logging.getLogger(__name__)
-
-# Load environment variables from .env file
-env_path = Path(__file__).parent.parent / '.env'
-load_dotenv(env_path)
 
 # Email Configuration
 SENDER_EMAIL = os.getenv("SENDER_EMAIL") or os.getenv("OUTLOOK_EMAIL")
@@ -36,7 +31,7 @@ def check_email_config():
         print("❌ No email configuration found!")
         print("You need SMTP credentials to send emails.")
         print("\n📧 SMTP Configuration:")
-        print("Set these environment variables in your .env file:")
+        print("Set these environment variables in GitHub repository secrets:")
         print("  SENDER_EMAIL=your-email@gmail.com")
         print("  SENDER_PASSWORD=your-app-password")
         print("  RECIPIENT_EMAIL=recipient@email.com")
@@ -54,7 +49,7 @@ def validate_email_config() -> None:
     if not all([SENDER_EMAIL, SENDER_PASSWORD]):
         raise ValueError(
             "Missing required email configuration.\n"
-            "Please set the following environment variables in your environment or .env file:\n"
+            "Please set the following environment variables in GitHub repository secrets:\n"
             "1. SENDER_EMAIL: Your email address (Gmail, Outlook, etc.)\n"
             "2. SENDER_PASSWORD: Your App Password\n\n"
             "For Gmail users:\n"

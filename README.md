@@ -3,32 +3,28 @@
 Daily **9:00 AM IST** cloud job that emails you IPOs **closing today** with a clear **Apply / Avoid** suggestion and details (price band, lot size, GMP trend, expert view).
 
 - ✅ **Free forever** (GitHub Actions free tier)
-- 🔔 **Email notification** (Outlook)
+- 🔔 **Email notification** (Gmail/Outlook)
 - 🧠 **Apply/Avoid** = Chittorgarh review + GMP trend
-- 🌐 Works even if your Mac/phone is off
+- 🌐 **100% Cloud-based** - No local setup required
 
 ---
 
 ## Quick Start
 
-### Option 1: SMTP (Easiest)
-1. **Fork this repo** or create a new one with these files.
-2. **Copy `.env.template` to `.env`** and fill in your credentials:
-   ```bash
-   cp .env.template .env
-   # Edit .env with your email credentials
-   ```
-3. **Get Outlook App Password** (if using 2FA): 
-   - Go to https://account.microsoft.com/security
-   - Create a new app password for "Mail"
-4. **Test locally** (optional):
-   ```bash
-   python -m ipo_reminder.ipo_reminder --dry-run
-   ```
-5. **For GitHub Actions**: Add repository secrets:
-   - `SENDER_EMAIL` or `OUTLOOK_EMAIL` — your Outlook address
-   - `SENDER_PASSWORD` or `OUTLOOK_APP_PASSWORD` — your app password
-   - `RECIPIENT_EMAIL` — email to receive reminders
+### Cloud Setup (GitHub Actions)
+1. **Fork this repo** to your GitHub account
+2. **Add repository secrets** in your forked repo:
+   - Go to Settings → Secrets and variables → Actions
+   - Add these secrets:
+     - `SENDER_EMAIL` — your Gmail/Outlook address  
+     - `SENDER_PASSWORD` — your app password
+     - `RECIPIENT_EMAIL` — email to receive reminders
+3. **Get App Password**:
+   - **Gmail**: Enable 2FA → https://myaccount.google.com/apppasswords
+   - **Outlook**: https://account.microsoft.com/security → Create app password
+4. **Activate workflow**:
+   - Go to Actions tab → Enable workflows
+   - The system will automatically send daily emails at 9:00 AM IST
 
 ### Option 2: Microsoft Graph API (Production)
 1. **Create Azure App Registration**
@@ -39,22 +35,16 @@ Daily **9:00 AM IST** cloud job that emails you IPOs **closing today** with a cl
 
 ---
 
-## Local Development
+## How It Works
 
-```bash
-# Install dependencies
-pip install -r requirements.txt
+The system runs automatically via **GitHub Actions** (cloud) at 9:00 AM IST daily:
 
-# Copy and edit config
-cp .env.template .env
-# Fill in your credentials in .env
+1. **Fetches IPO data** from multiple sources (SEBI, BSE, NSE, Chittorgarh)
+2. **Filters IPOs** closing today with Apply/Avoid recommendations  
+3. **Sends email** with formatted IPO details and analysis
+4. **Logs results** for monitoring and debugging
 
-# Test without sending email
-python -m ipo_reminder.ipo_reminder --dry-run
-
-# Run for real
-python -m ipo_reminder.ipo_reminder
-```
+**No local setup required** - everything runs in GitHub's cloud!
 
 ---
 
@@ -63,9 +53,9 @@ python -m ipo_reminder.ipo_reminder
 An email like:
 
 ```
-Subject: IPO Reminder – 19 Aug 2025 (Last-day alerts)
+Subject: IPO Reminder • 19 Aug 2025 (Last-day alerts)
 
-Hello Dillu 👋
+Hello! 👋
 
 These IPO(s) close today:
 
@@ -95,55 +85,21 @@ These IPO(s) close today:
 
 ---
 
-## Local testing (optional)
-
-```bash
-python3 -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
-export OUTLOOK_EMAIL="you@outlook.com"
-export OUTLOOK_APP_PASSWORD="your-app-password"
-export RECIPIENT_EMAIL="you@outlook.com"
-python ipo_reminder/main.py
-```
-
----
-
 ## Timezone
 
 GitHub Actions uses UTC. The workflow cron `30 3 * * *` maps to **09:00 IST**.
 
 ## Secrets and CI (important)
 
-Never commit secrets or credentials to the repository. Use a local `.env` file for development and keep it listed in `.gitignore`.
+Never commit secrets or credentials to the repository. This project runs 100% in the cloud using GitHub Actions.
 
-For CI (GitHub Actions), store sensitive values as repository secrets and reference them in workflows. Example secrets to add in the repository settings:
+For GitHub Actions to work, store sensitive values as repository secrets and reference them in workflows. Example secrets to add in the repository settings:
 
-- `CLIENT_ID`
-- `CLIENT_SECRET`
-- `TENANT_ID`
-- `OUTLOOK_EMAIL` (or `SENDER_EMAIL`)
-- `OUTLOOK_APP_PASSWORD` (if using SMTP fallback)
+- `SENDER_EMAIL` (your Gmail address)
+- `SENDER_PASSWORD` (Gmail App Password)
+- `RECIPIENT_EMAIL` (where to send IPO reminders)
 
-Do not copy secret values into files in the repo. If a secret is accidentally committed, rotate it immediately and remove it from git history.
-
-Local developer setup (recommended):
-
-1. Create a virtualenv and install deps:
-
-```bash
-python -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
-```
-
-2. Install pre-commit hooks:
-
-```bash
-pre-commit install
-```
-
-This will block accidental commits of `.env` or common secret patterns.
+Do not copy secret values into files in the repo.
 
 Automate setting GitHub secrets (optional)
 
