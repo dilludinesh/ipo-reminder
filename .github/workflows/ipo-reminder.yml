@@ -26,11 +26,11 @@ jobs:
         
     - name: Run IPO Reminder
       env:
-        CLIENT_ID: ${{ secrets.CLIENT_ID }}
-        CLIENT_SECRET: ${{ secrets.CLIENT_SECRET }}
-        TENANT_ID: ${{ secrets.TENANT_ID }}
         SENDER_EMAIL: ${{ secrets.SENDER_EMAIL }}
         SENDER_PASSWORD: ${{ secrets.SENDER_PASSWORD }}
         RECIPIENT_EMAIL: ${{ secrets.RECIPIENT_EMAIL }}
       run: |
+        echo "⏰ Workflow execution time:"
+        echo "  UTC: $(date -u '+%Y-%m-%d %H:%M:%S %Z')"
+        echo "  IST: $(TZ='Asia/Kolkata' date '+%Y-%m-%d %H:%M:%S %Z')"
         python -m ipo_reminder.ipo_reminder
