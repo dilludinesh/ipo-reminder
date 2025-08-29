@@ -69,7 +69,7 @@ def send_email(
     msg = EmailMessage()
     msg['Subject'] = subject
     # Set friendly display name for the sender
-    msg['From'] = f"IPO Reminder 📈 <{sender}>"
+    msg['From'] = f"IPO Reminder <{sender}>"
     msg['To'] = ', '.join(recipients)
     if html_body and html_body.strip():
         msg.set_content(body)

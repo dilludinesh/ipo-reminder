@@ -487,7 +487,7 @@ No IPOs are closing today ({now_date.strftime('%d-%b-%Y')}).
 Your investment portfolio remains focused. Use this time to research upcoming opportunities.
 
 Regards,
-IPO Reminder 📈
+IPO Reminder
 """
         return subject, body
     
