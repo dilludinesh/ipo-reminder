@@ -99,13 +99,13 @@ def format_html_email(ipos: list, now_date: str) -> str:
     
     # Create simple preheader text based on content
     if not ipos:
-        preheader = "No IPOs closing today - All clear!"
+        preheader = "No IPOs closing today - Market status update"
     else:
         apply_count = sum(1 for ipo in ipos if hasattr(ipo, 'recommendation') and 'APPLY' in str(getattr(ipo, 'recommendation', '') or ''))
         if apply_count > 0:
-            preheader = f"{apply_count} IPO recommendation(s) closing today!"
+            preheader = f"{apply_count} recommended IPO(s) closing today"
         else:
-            preheader = f"{len(ipos)} IPO(s) closing today - Check details"
+            preheader = f"{len(ipos)} IPO(s) closing today - Review required"
 
     # Start HTML content
     html_parts = [
@@ -307,7 +307,7 @@ def format_html_email(ipos: list, now_date: str) -> str:
     
     <div class="email-container">
         <div class="header">
-            <h1>🏦 IPO Reminder</h1>
+            <h1>📈 IPO Market Update</h1>
             <div class="date">{now_date}</div>
         </div>
         
@@ -317,14 +317,14 @@ def format_html_email(ipos: list, now_date: str) -> str:
     if not ipos:
         html_parts.append('''
             <div class="no-ipos">
-                <div class="no-ipos-icon">✅</div>
-                <h2>All Clear!</h2>
-                <p>No IPOs are closing today. Enjoy your day! 😊</p>
+                <div class="no-ipos-icon">📊</div>
+                <h2>No IPO Closures Today</h2>
+                <p>There are no Initial Public Offerings closing today. Market activity is light.</p>
             </div>''')
     else:
         html_parts.append(f'''
             <h2 style="color: #2c3e50; margin: 0 0 25px 0; font-size: 22px; font-weight: 600;">
-                📊 {len(ipos)} IPO{"s" if len(ipos) != 1 else ""} Closing Today
+                � {len(ipos)} IPO{"s" if len(ipos) != 1 else ""} Closing Today
             </h2>''')
         
         for ipo in ipos:
@@ -356,8 +356,8 @@ def format_html_email(ipos: list, now_date: str) -> str:
                 <div class="ipo-header">
                     <div class="ipo-title">{name}</div>
                     <div class="ipo-meta">
-                        <span>💰 Price: {price_band}</span>
-                        <span>📦 Lot: {lot_size}</span>
+                        <span>💰 Price Band: {price_band}</span>
+                        <span>📦 Lot Size: {lot_size}</span>
                         <span>📅 Listing: {listing_date}</span>
                     </div>
                 </div>
@@ -373,10 +373,10 @@ def format_html_email(ipos: list, now_date: str) -> str:
         </div>
         
         <div class="footer">
-            <p>💡 <strong>IPO Reminder</strong> • Automated daily notifications</p>
+            <p>� <strong>IPO Market Update</strong> • Automated Daily Investment Notifications</p>
             <p style="margin-top: 10px;">
-                Get timely updates on IPO closing dates • 
-                <a href="#">Manage preferences</a>
+                Professional IPO closing alerts and investment recommendations • 
+                <a href="#">Investment Preferences</a>
             </p>
         </div>
     </div>
