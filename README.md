@@ -1,6 +1,6 @@
 # IPO Reminder
 
-Daily **8:30 AM IST** cloud job that emails you IPOs **closing today** with a clear **Apply / Avoid** suggestion and details (price band, lot size, GMP trend, expert view).
+Daily **9:00 AM IST** cloud job that emails you IPOs **closing today** with a clear **Apply / Avoid** suggestion and details (price band, lot size, GMP trend, expert view).
 
 - ✅ **Free forever** (GitHub Actions free tier)
 - 🔔 **Email notification** (Outlook)
@@ -111,7 +111,7 @@ python ipo_reminder/main.py
 
 ## Timezone
 
-GitHub Actions uses UTC. The workflow cron `0 3 * * *` maps to **08:30 IST**.
+GitHub Actions uses UTC. The workflow cron `30 3 * * *` maps to **09:00 IST**.
 
 ## Secrets and CI (important)
 

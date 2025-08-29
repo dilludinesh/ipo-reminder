@@ -2,8 +2,8 @@ name: IPO Reminder
 
 on:
   schedule:
-    # Run daily at 8:30 AM IST (3:00 AM UTC)
-    - cron: '0 3 * * *'
+    # Run daily at 9:00 AM IST (3:30 AM UTC)
+    - cron: '30 3 * * *'
   workflow_dispatch:  # Allow manual triggering
 
 jobs:
