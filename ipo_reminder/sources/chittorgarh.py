@@ -469,10 +469,10 @@ def format_email(now_date: date, ipos: List[IPOInfo]) -> Tuple[str, str]:
     """Format email with personalized IPO recommendations for Dinesh."""
     from ..advisor import get_personalized_recommendations
     
-    # Create consistent subject line with bot name, date and day
-    day_name = now_date.strftime('%A')  # Full day name (Monday, Tuesday, etc.)
-    formatted_date = now_date.strftime('%d %b %Y')  # 22 Aug 2025
-    subject = f"IPO Reminder Bot • {day_name}, {formatted_date}"
+        # Create consistent subject line with service name, date and day
+    day_name = now_date.strftime("%A")
+    formatted_date = now_date.strftime("%d %b %Y")
+    subject = f"IPO Reminder • {day_name}, {formatted_date}"
     
     if not ipos:
         # Simple preview text
@@ -487,7 +487,7 @@ No IPOs are closing today ({now_date.strftime('%d-%b-%Y')}).
 Your investment portfolio remains focused. Use this time to research upcoming opportunities.
 
 Regards,
-IPO Reminder Bot 🤖
+IPO Reminder 📈
 """
         return subject, body
     

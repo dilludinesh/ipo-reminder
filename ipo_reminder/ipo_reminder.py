@@ -12,7 +12,7 @@ from .emailer import send_email, format_html_email
 
 def handler(dry_run=False):
     logger = logging.getLogger(__name__)
-    logger.info("IPO Reminder Bot started.")
+    logger.info("IPO Reminder started.")
     
     if not check_email_config():
         sys.exit(1)
@@ -56,7 +56,7 @@ def handler(dry_run=False):
         logger.info("DRY RUN completed - no email sent.")
     else:
         send_email(subject, body, html_body=html_body)
-        logger.info("IPO Reminder Bot finished sending email.")
+        logger.info("IPO Reminder finished sending email.")
 
 if __name__ == "__main__":
     # Support --dry-run flag for testing

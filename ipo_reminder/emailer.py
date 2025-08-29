@@ -69,7 +69,7 @@ def send_email(
     msg = EmailMessage()
     msg['Subject'] = subject
     # Set friendly display name for the sender
-    msg['From'] = f"IPO Reminder Bot 🤖 <{sender}>"
+    msg['From'] = f"IPO Reminder 📈 <{sender}>"
     msg['To'] = ', '.join(recipients)
     if html_body and html_body.strip():
         msg.set_content(body)
@@ -307,7 +307,7 @@ def format_html_email(ipos: list, now_date: str) -> str:
     
     <div class="email-container">
         <div class="header">
-            <h1>🏦 IPO Reminder Bot</h1>
+            <h1>🏦 IPO Reminder</h1>
             <div class="date">{now_date}</div>
         </div>
         
@@ -373,7 +373,7 @@ def format_html_email(ipos: list, now_date: str) -> str:
         </div>
         
         <div class="footer">
-            <p>💡 <strong>IPO Reminder Bot</strong> • Automated daily notifications</p>
+            <p>💡 <strong>IPO Reminder</strong> • Automated daily notifications</p>
             <p style="margin-top: 10px;">
                 Get timely updates on IPO closing dates • 
                 <a href="#">Manage preferences</a>

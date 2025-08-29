@@ -3,9 +3,9 @@ requires = ["setuptools>=61.0"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "ipo-reminder-bot"
+name = "ipo-reminder"
 version = "0.1.0"
-description = "A bot that sends daily IPO reminders with Apply/Avoid suggestions via email."
+description = "A service that sends daily IPO reminders with Apply/Avoid suggestions via email."
 authors = [
     { name = "Dinesh Reddy", email = "reddy.dinesh@live.com" }
 ]

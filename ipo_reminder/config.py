@@ -1,4 +1,4 @@
-"""Configuration settings for the IPO Reminder Bot."""
+"""Configuration settings for the IPO Reminder."""
 import os
 import logging
 from typing import Optional

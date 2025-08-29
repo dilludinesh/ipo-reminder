@@ -154,7 +154,7 @@ If you use the GitHub CLI (`gh`), there's a helper script to set the required re
 chmod +x scripts/set_github_secrets.sh
 # then run (replace owner/repo)
 CLIENT_ID=... CLIENT_SECRET=... TENANT_ID=... OUTLOOK_EMAIL=... OUTLOOK_APP_PASSWORD=... RECIPIENT_EMAIL=... \
-  ./scripts/set_github_secrets.sh dilludinesh/ipo-reminder-bot
+  ./scripts/set_github_secrets.sh dilludinesh/ipo-reminder
 ```
 
 This will push the secrets to GitHub Actions securely.

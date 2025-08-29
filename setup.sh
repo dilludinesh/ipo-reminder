@@ -1,7 +1,7 @@
 #!/bin/bash
-# Complete setup script for IPO Reminder Bot
+# Complete setup script for IPO Reminder
 
-echo "🚀 Setting up IPO Reminder Bot..."
+echo "🚀 Setting up IPO Reminder..."
 
 # Create .env with template
 if [ ! -f .env ]; then
