@@ -12,7 +12,13 @@ logger = logging.getLogger(__name__)
 
 
 class EmailError(Exception):
-    """Custom exception for email sending errors."""
+    """Custom exception for em            </div>''')
+    
+    html_parts.append('''
+        </div>
+    </div>
+</body>
+</html>''')ors."""
     pass
 
 
@@ -276,20 +282,6 @@ def format_html_email(ipos: list, now_date: str) -> str:
             border: 2px solid #ffeaa7;
         }}
         
-        .footer {{
-            background-color: #f8f9fa;
-            padding: 20px;
-            text-align: center;
-            border-top: 1px solid #e9ecef;
-            font-size: 12px;
-            color: #6c757d;
-        }}
-        
-        .footer a {{
-            color: #667eea;
-            text-decoration: none;
-        }}
-        
         /* Responsive design */
         @media only screen and (max-width: 600px) {{
             .email-container {{ width: 100% !important; margin: 0 !important; }}
@@ -307,7 +299,7 @@ def format_html_email(ipos: list, now_date: str) -> str:
     
     <div class="email-container">
         <div class="header">
-            <h1>📈 IPO Market Update</h1>
+            <h1>IPO Market Update</h1>
             <div class="date">{now_date}</div>
         </div>
         
