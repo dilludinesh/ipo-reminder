@@ -1,24 +1,12 @@
-"""Email sending functionality for Outlook using Microsoft Graph API with OAuth2."""
+"""Simple email sending functionality using SMTP."""
 import logging
 import os
-import json
-import time
+import smtplib
+from datetime import datetime
+from email.message import EmailMessage
 from typing import List, Optional
 
-import requests
-import msal
-import smtplib
-from email.message import EmailMessage
-
 from .config import SENDER_EMAIL, RECIPIENT_EMAIL, validate_email_config
-
-# Microsoft Graph API Configuration
-CLIENT_ID = os.getenv('CLIENT_ID')
-CLIENT_SECRET = os.getenv('CLIENT_SECRET')
-TENANT_ID = os.getenv('TENANT_ID', 'common')
-AUTHORITY = f"https://login.microsoftonline.com/{TENANT_ID}"
-SCOPES = ["https://graph.microsoft.com/.default"]
-GRAPH_ENDPOINT = 'https://graph.microsoft.com/v1.0'
 
 logger = logging.getLogger(__name__)
 
@@ -31,8 +19,6 @@ class EmailError(Exception):
 def _append_email_log(status: str, recipient: str, subject: str, detail: str = "") -> None:
     """Append email attempt to log file with timestamp."""
     try:
-        import os
-        from datetime import datetime
         os.makedirs("logs", exist_ok=True)
         timestamp = datetime.utcnow().isoformat() + "Z"
         log_entry = f"{timestamp}\t{status}\t{recipient}\t{subject}\t{detail}\n"
@@ -42,36 +28,17 @@ def _append_email_log(status: str, recipient: str, subject: str, detail: str = "
         logger.warning(f"Failed to write email log: {e}")
 
 
-def get_access_token() -> str:
-    """Get an access token using client credentials flow."""
-    try:
-        app = msal.ConfidentialClientApplication(
-            client_id=CLIENT_ID,
-            client_credential=CLIENT_SECRET,
-            authority=AUTHORITY,
-        )
+def send_email(
+    subject: str,
+    body: str,
+    html_body: Optional[str] = None,
+    recipients: Optional[List[str]] = None,
+) -> bool:
+    """Send an email using SMTP."""
+    if not recipients:
+        recipients = [RECIPIENT_EMAIL]
 
-        result = app.acquire_token_silent(SCOPES, account=None)
-        if not result:
-            logger.info("No suitable token exists in cache. Getting a new one.")
-            result = app.acquire_token_for_client(scopes=SCOPES)
-
-        if result and "access_token" in result:
-            return result["access_token"]
-
-        error_msg = f"Could not acquire token: {result.get('error')} - {result.get('error_description')}"
-        logger.error(error_msg)
-        raise EmailError(error_msg)
-
-    except Exception as e:
-        error_msg = f"Error getting access token: {str(e)}"
-        logger.error(error_msg)
-        raise EmailError(error_msg)
-
-
-def _send_via_smtp(subject: str, body: str, html_body: Optional[str], recipients: List[str]) -> bool:
-    """Send email using provider-specific SMTP settings with enhanced authentication."""
-    sender = os.getenv('SENDER_EMAIL')
+    sender = os.getenv('SENDER_EMAIL') or SENDER_EMAIL
     password = os.getenv('SENDER_PASSWORD')
 
     if not sender or not password:
@@ -127,104 +94,6 @@ def _send_via_smtp(subject: str, body: str, html_body: Optional[str], recipients
         return False
 
 
-def send_email(
-    subject: str,
-    body: str,
-    html_body: Optional[str] = None,
-    recipients: Optional[List[str]] = None,
-    max_retries: int = 3,
-    retry_delay: int = 5,
-) -> bool:
-    """Send an email using Microsoft Graph API with OAuth2. Falls back to SMTP if Graph credentials are missing."""
-    if not recipients:
-        recipients = [RECIPIENT_EMAIL]
-
-    # Check if sender email is a personal account
-    sender_domain = SENDER_EMAIL.split('@')[1] if '@' in SENDER_EMAIL else ''
-    is_personal_account = sender_domain.lower() in ['live.com', 'hotmail.com', 'outlook.com', 'gmail.com']
-    
-    # For personal accounts, try SMTP first since Graph API application permissions don't work well
-    if is_personal_account:
-        logger.info("Personal account detected, trying SMTP first")
-        if _send_via_smtp(subject, body, html_body, recipients):
-            return True
-        logger.warning("SMTP failed for personal account, trying Graph API anyway")
-
-    email_msg = {
-        "message": {
-            "subject": subject,
-            "body": {
-                "contentType": "HTML" if (html_body and html_body.strip()) else "Text",
-                "content": html_body if (html_body and html_body.strip()) else body,
-            },
-            "toRecipients": [{"emailAddress": {"address": addr}} for addr in recipients],
-            "from": {
-                "emailAddress": {
-                    "address": SENDER_EMAIL,
-                    "name": "IPO Reminder Bot 🤖"
-                }
-            }
-        },
-        "saveToSentItems": "true",
-    }
-
-    if CLIENT_ID and CLIENT_SECRET:
-        for attempt in range(1, max_retries + 1):
-            try:
-                access_token = get_access_token()
-                headers = {
-                    'Authorization': f'Bearer {access_token}',
-                    'Content-Type': 'application/json',
-                }
-
-                response = requests.post(
-                    f"{GRAPH_ENDPOINT}/users/{SENDER_EMAIL}/sendMail",
-                    headers=headers,
-                    json=email_msg,
-                    timeout=30,
-                )
-
-                if response.status_code == 429:
-                    retry_after = int(response.headers.get('Retry-After', retry_delay))
-                    logger.warning(f"Rate limited. Retrying after {retry_after} seconds...")
-                    time.sleep(retry_after)
-                    continue
-
-                if response.status_code == 401:
-                    logger.warning("Authentication expired. Refreshing token...")
-                    continue
-
-                response.raise_for_status()
-                logger.info(f"Email sent successfully to {', '.join(recipients)} via Microsoft Graph")
-                return True
-
-            except requests.exceptions.RequestException as e:
-                error_msg = f"Error sending email (attempt {attempt}/{max_retries}): {str(e)}"
-                if hasattr(e, 'response') and e.response is not None:
-                    try:
-                        error_details = e.response.json()
-                        error_msg += f"\nResponse: {json.dumps(error_details, indent=2)}"
-                    except Exception:
-                        error_msg += f"\nResponse: {e.response.text}"
-
-                logger.warning(error_msg)
-
-                if attempt < max_retries:
-                    wait_time = retry_delay * (2 ** (attempt - 1))
-                    logger.warning(f"Retrying in {wait_time} seconds...")
-                    time.sleep(wait_time)
-                else:
-                    logger.error(f"Failed to send email after {max_retries} attempts using Graph API")
-                    # Try SMTP fallback as final attempt
-                    logger.info("Trying SMTP fallback after Graph API failure")
-                    return _send_via_smtp(subject, body, html_body, recipients)
-
-        return False
-
-    logger.info("Graph credentials not found; using SMTP fallback")
-    return _send_via_smtp(subject, body, html_body, recipients)
-
-
 def format_html_email(ipos: list, now_date: str) -> str:
     """Format IPO information as a simple HTML email."""
     
@@ -234,185 +103,284 @@ def format_html_email(ipos: list, now_date: str) -> str:
     else:
         apply_count = sum(1 for ipo in ipos if hasattr(ipo, 'recommendation') and 'APPLY' in str(getattr(ipo, 'recommendation', '') or ''))
         if apply_count > 0:
-            company_names = [ipo.name for ipo in ipos if hasattr(ipo, 'recommendation') and 'APPLY' in str(getattr(ipo, 'recommendation', '') or '')][:1]
-            if company_names:
-                preheader = f"HOT: {company_names[0]} - Don't miss out!"
-            else:
-                preheader = f"{apply_count} hot IPOs closing today"
+            preheader = f"{apply_count} IPO recommendation(s) closing today!"
         else:
-            company_names = [ipo.name for ipo in ipos[:1]]
-            if len(ipos) == 1:
-                preheader = f"{company_names[0]} closes today"
-            else:
-                preheader = f"{len(ipos)} IPOs closing today"
+            preheader = f"{len(ipos)} IPO(s) closing today - Check details"
+
+    # Start HTML content
+    html_parts = [
+        f'''<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>IPO Reminder - {now_date}</title>
+    <!--[if mso]>
+    <noscript>
+        <xml>
+            <o:OfficeDocumentSettings>
+                <o:PixelsPerInch>96</o:PixelsPerInch>
+            </o:OfficeDocumentSettings>
+        </xml>
+    </noscript>
+    <![endif]-->
+    <style>
+        /* Reset styles */
+        body, table, td, p, a, span {{ margin: 0; padding: 0; border: 0; font-size: 100%; font: inherit; vertical-align: baseline; }}
+        table {{ border-collapse: collapse; border-spacing: 0; }}
+        
+        /* Base styles */
+        body {{
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;
+            line-height: 1.6;
+            color: #333333;
+            background-color: #f8f9fa;
+            margin: 0;
+            padding: 0;
+            -webkit-text-size-adjust: 100%;
+            -ms-text-size-adjust: 100%;
+        }}
+        
+        .email-container {{
+            max-width: 600px;
+            margin: 0 auto;
+            background-color: #ffffff;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }}
+        
+        .header {{
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px 20px;
+            text-align: center;
+        }}
+        
+        .header h1 {{
+            margin: 0;
+            font-size: 28px;
+            font-weight: 700;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.3);
+        }}
+        
+        .header .date {{
+            font-size: 16px;
+            opacity: 0.9;
+            margin-top: 8px;
+        }}
+        
+        .content {{
+            padding: 30px;
+        }}
+        
+        .no-ipos {{
+            text-align: center;
+            padding: 40px 20px;
+            background-color: #f8f9fa;
+            border-radius: 8px;
+            margin: 20px 0;
+        }}
+        
+        .no-ipos-icon {{
+            font-size: 48px;
+            margin-bottom: 20px;
+        }}
+        
+        .no-ipos h2 {{
+            color: #28a745;
+            margin: 0 0 15px 0;
+            font-size: 24px;
+            font-weight: 600;
+        }}
+        
+        .no-ipos p {{
+            color: #6c757d;
+            font-size: 16px;
+            margin: 0;
+        }}
+        
+        .ipo-card {{
+            border: 1px solid #e9ecef;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            overflow: hidden;
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }}
+        
+        .ipo-card:hover {{
+            transform: translateY(-2px);
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        }}
+        
+        .ipo-header {{
+            padding: 20px;
+            border-bottom: 1px solid #e9ecef;
+        }}
+        
+        .ipo-title {{
+            font-size: 20px;
+            font-weight: 700;
+            color: #2c3e50;
+            margin: 0 0 8px 0;
+        }}
+        
+        .ipo-meta {{
+            display: flex;
+            flex-wrap: wrap;
+            gap: 15px;
+            font-size: 14px;
+            color: #6c757d;
+        }}
+        
+        .ipo-body {{
+            padding: 20px;
+        }}
+        
+        .price-band {{
+            background-color: #f8f9fa;
+            padding: 15px;
+            border-radius: 6px;
+            margin-bottom: 15px;
+        }}
+        
+        .price-band strong {{
+            color: #495057;
+        }}
+        
+        .recommendation {{
+            padding: 12px 18px;
+            border-radius: 25px;
+            font-weight: 600;
+            text-align: center;
+            margin: 15px 0;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }}
+        
+        .rec-apply {{
+            background-color: #d4edda;
+            color: #155724;
+            border: 2px solid #c3e6cb;
+        }}
+        
+        .rec-avoid {{
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 2px solid #f5c6cb;
+        }}
+        
+        .rec-neutral {{
+            background-color: #fff3cd;
+            color: #856404;
+            border: 2px solid #ffeaa7;
+        }}
+        
+        .footer {{
+            background-color: #f8f9fa;
+            padding: 20px;
+            text-align: center;
+            border-top: 1px solid #e9ecef;
+            font-size: 12px;
+            color: #6c757d;
+        }}
+        
+        .footer a {{
+            color: #667eea;
+            text-decoration: none;
+        }}
+        
+        /* Responsive design */
+        @media only screen and (max-width: 600px) {{
+            .email-container {{ width: 100% !important; margin: 0 !important; }}
+            .header {{ padding: 20px 15px !important; }}
+            .header h1 {{ font-size: 24px !important; }}
+            .content {{ padding: 20px 15px !important; }}
+            .ipo-meta {{ flex-direction: column; gap: 8px; }}
+        }}
+    </style>
+</head>
+<body>
+    <div style="display: none; font-size: 1px; color: #ffffff; line-height: 1px; max-height: 0px; max-width: 0px; opacity: 0; overflow: hidden;">
+        {preheader}
+    </div>
     
-    html = f"""
-    <html>
-    <head>
-        <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>IPO Reminder - {now_date}</title>
-        <style>
-            body {{ 
-                font-family: Arial, sans-serif; 
-                line-height: 1.6; 
-                margin: 0;
-                padding: 20px;
-                background-color: #f5f5f5;
-            }}
-            .container {{ 
-                max-width: 600px; 
-                margin: 0 auto; 
-                padding: 20px;
-                background: white;
-                border-radius: 5px;
-                box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-            }}
-            .header {{
-                text-align: center;
-                background: #f8f9fa;
-                padding: 20px;
-                border-radius: 5px;
-                margin-bottom: 20px;
-            }}
-            .header h1 {{ 
-                margin: 0;
-                color: #333;
-                font-size: 1.5em;
-            }}
-            .ipo-item {{ 
-                border: 1px solid #ddd;
-                border-radius: 5px; 
-                padding: 15px; 
-                margin-bottom: 15px;
-                background-color: #fafafa;
-            }}
-            .ipo-name {{ 
-                font-size: 1.1em; 
-                font-weight: bold; 
-                color: #333;
-                margin-bottom: 10px;
-            }}
-            .detail {{ 
-                margin-bottom: 5px;
-            }}
-            .label {{ 
-                font-weight: bold;
-                color: #666;
-            }}
-            .recommendation {{ 
-                font-weight: bold; 
-                margin-top: 10px;
-                padding: 10px;
-                background-color: #e9ecef;
-                border-radius: 3px;
-            }}
-            .no-ipos {{
-                text-align: center;
-                padding: 30px;
-                color: #666;
-            }}
-            .footer {{
-                text-align: center;
-                margin-top: 20px;
-                padding: 15px;
-                background: #f8f9fa;
-                border-radius: 5px;
-                color: #666;
-                font-size: 0.9em;
-            }}
-        </style>
-    </head>
-    <body>
-        <!-- Preheader text for email clients -->
-        <div style="display: none; max-height: 0; overflow: hidden; font-size: 1px; line-height: 1px; color: #ffffff; mso-hide: all;">
-            {preheader}
+    <div class="email-container">
+        <div class="header">
+            <h1>🏦 IPO Reminder Bot</h1>
+            <div class="date">{now_date}</div>
         </div>
         
-        <div class="container">
-            <div class="header">
-                <h1>IPO Reminder for {now_date}</h1>
-            </div>
-    """
-    
+        <div class="content">'''
+    ]
+
     if not ipos:
-        html += """
+        html_parts.append('''
             <div class="no-ipos">
-                <div><strong>All Clear Today!</strong></div>
-                <div>No IPOs are closing today.</div>
-            </div>
-        """
+                <div class="no-ipos-icon">✅</div>
+                <h2>All Clear!</h2>
+                <p>No IPOs are closing today. Enjoy your day! 😊</p>
+            </div>''')
     else:
-        html += f"<p>Hello Dinesh,</p><p>{len(ipos)} IPO{'s' if len(ipos) > 1 else ''} closing today:</p>"
+        html_parts.append(f'''
+            <h2 style="color: #2c3e50; margin: 0 0 25px 0; font-size: 22px; font-weight: 600;">
+                📊 {len(ipos)} IPO{"s" if len(ipos) != 1 else ""} Closing Today
+            </h2>''')
         
         for ipo in ipos:
-            # Get recommendation
-            rec_text = ""
-            if hasattr(ipo, 'recommendation') and ipo.recommendation:
-                rec_text = f"{ipo.recommendation}"
-                if hasattr(ipo, 'recommendation_reason'):
-                    rec_text += f" - {ipo.recommendation_reason}"
+            # Safely get attributes
+            name = getattr(ipo, 'name', 'Unknown IPO')
+            price_band = getattr(ipo, 'price_band', 'Price not available')
+            lot_size = getattr(ipo, 'lot_size', 'Not specified')
+            listing_date = getattr(ipo, 'listing_date', 'TBA')
+            recommendation = getattr(ipo, 'recommendation', None)
             
-            html += f"""
-            <div class="ipo-item">
-                <div class="ipo-name">{ipo.name}</div>
-                
-                <div class="detail">
-                    <span class="label">Price Band:</span> {getattr(ipo, 'price_band', None) or 'Not specified'}
-                </div>
-                
-                <div class="detail">
-                    <span class="label">Lot Size:</span> {getattr(ipo, 'lot_size', None) or 'N/A'}
-                </div>
-                
-                <div class="detail">
-                    <span class="label">Issue Size:</span> {getattr(ipo, 'issue_size', None) or 'N/A'}
-                </div>
-                
-                <div class="detail">
-                    <span class="label">Close Date:</span> {getattr(ipo, 'close_date', None) or 'N/A'}
-                </div>
-            """
+            # Format recommendation
+            if recommendation:
+                rec_text = str(recommendation).upper()
+                if 'APPLY' in rec_text:
+                    rec_class = 'rec-apply'
+                    rec_icon = '✅'
+                elif 'AVOID' in rec_text:
+                    rec_class = 'rec-avoid'
+                    rec_icon = '❌'
+                else:
+                    rec_class = 'rec-neutral'
+                    rec_icon = '⚠️'
+                rec_html = f'<div class="recommendation {rec_class}">{rec_icon} {recommendation}</div>'
+            else:
+                rec_html = ''
             
-            if hasattr(ipo, 'gmp_latest') and ipo.gmp_latest:
-                html += f"""
-                <div class="detail">
-                    <span class="label">GMP:</span> {ipo.gmp_latest} ({getattr(ipo, 'gmp_trend', 'unknown')})
+            html_parts.append(f'''
+            <div class="ipo-card">
+                <div class="ipo-header">
+                    <div class="ipo-title">{name}</div>
+                    <div class="ipo-meta">
+                        <span>💰 Price: {price_band}</span>
+                        <span>📦 Lot: {lot_size}</span>
+                        <span>📅 Listing: {listing_date}</span>
+                    </div>
                 </div>
-                """
-            
-            if hasattr(ipo, 'expert_recommendation') and ipo.expert_recommendation:
-                html += f"""
-                <div class="detail">
-                    <span class="label">Expert View:</span> {ipo.expert_recommendation}
+                <div class="ipo-body">
+                    <div class="price-band">
+                        <strong>Price Band:</strong> {price_band}
+                    </div>
+                    {rec_html}
                 </div>
-                """
-            
-            if rec_text:
-                html += f"""
-                <div class="recommendation">
-                    Recommendation: {rec_text}
-                </div>
-                """
-            
-            # Add links if available
-            if hasattr(ipo, 'detail_url') and ipo.detail_url:
-                html += f"""
-                <div style="margin-top: 10px;">
-                    <a href="{ipo.detail_url}" style="color: #007bff; text-decoration: none;">View Details</a>
-                </div>
-                """
-
-            html += "</div>"
-
-    html += """
-            <div class="footer">
-                <div><strong>Disclaimer:</strong> Suggestions are informational, not financial advice.</div>
-                <div style="margin-top: 5px;"><strong>IPO Reminder Bot</strong></div>
-            </div>
+            </div>''')
+    
+    html_parts.append('''
         </div>
-    </body>
-    </html>
-    """
-
-    return html
+        
+        <div class="footer">
+            <p>💡 <strong>IPO Reminder Bot</strong> • Automated daily notifications</p>
+            <p style="margin-top: 10px;">
+                Get timely updates on IPO closing dates • 
+                <a href="#">Manage preferences</a>
+            </p>
+        </div>
+    </div>
+</body>
+</html>''')
+    
+    return ''.join(html_parts)
