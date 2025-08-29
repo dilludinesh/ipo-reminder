@@ -46,8 +46,8 @@ def handler(dry_run=False):
         logger.info(f"Found {len(ipos)} IPO(s) closing today from fallback sources.")
     
     subject, body = format_email(today, ipos)
-    html_body = format_html_email(ipos, today.strftime('%d %b %Y'))
-
+    # No HTML - just simple plain text email
+    
     if dry_run:
         print(f"\n📧 DRY RUN - Would send email:")
         print(f"Subject: {subject}")
@@ -55,7 +55,7 @@ def handler(dry_run=False):
         print(f"Body preview: {body[:200]}...")
         logger.info("DRY RUN completed - no email sent.")
     else:
-        send_email(subject, body, html_body=html_body)
+        send_email(subject, body, html_body=None)  # No HTML
         logger.info("IPO Reminder finished sending email.")
 
 if __name__ == "__main__":
