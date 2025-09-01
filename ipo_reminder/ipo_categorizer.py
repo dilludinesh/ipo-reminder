@@ -25,13 +25,15 @@ class IPOCategorizer:
         # SME indicators in company names
         self.sme_indicators = [
             'sme', 'small', 'micro', 'emerge', 'limited liability partnership',
-            'llp', 'private limited', 'pvt ltd'
+            'llp', 'private limited', 'pvt ltd', 'projects', 'engineering projects',
+            'oval', 'enterprises', 'services', 'ventures', 'associates'
         ]
         
-        # Main board indicators
+        # Main board indicators (must be strong indicators)
         self.main_board_indicators = [
-            'technologies', 'corporation', 'industries', 'enterprises',
-            'systems', 'solutions', 'group', 'international', 'global'
+            'technologies limited', 'corporation limited', 'industries limited',
+            'international limited', 'global limited', 'systems limited',
+            'solutions limited'
         ]
         
         # Known large companies (definitely main board)
@@ -66,12 +68,12 @@ class IPOCategorizer:
                 retail_friendly=False  # Higher risk for retail
             )
         
-        # Price-based classification
+        # Price-based classification (more aggressive SME detection)
         if price_band:
             avg_price = self._extract_average_price(price_band)
             if avg_price:
-                # Very low price often indicates SME
-                if avg_price < 50:
+                # Low price strongly indicates SME
+                if avg_price < 100:
                     return IPOCategory(
                         category="SME",
                         exchange="BSE_SME/NSE_EMERGE", 
@@ -79,8 +81,8 @@ class IPOCategorizer:
                         lot_size=lot_size,
                         retail_friendly=False
                     )
-                # Higher price often indicates Main Board
-                elif avg_price > 200:
+                # Very high price indicates Main Board
+                elif avg_price > 500:
                     return IPOCategory(
                         category="MAIN_BOARD",
                         exchange="NSE/BSE",
@@ -89,7 +91,7 @@ class IPOCategorizer:
                         retail_friendly=True
                     )
         
-        # Business name analysis
+        # Business name analysis (stricter criteria for Main Board)
         if any(indicator in name_lower for indicator in self.main_board_indicators):
             return IPOCategory(
                 category="MAIN_BOARD",
@@ -99,13 +101,13 @@ class IPOCategorizer:
                 retail_friendly=True
             )
         
-        # Default to Main Board if uncertain (safer assumption)
+        # Default to SME if uncertain (safer for retail investors to be cautious)
         return IPOCategory(
-            category="MAIN_BOARD", 
-            exchange="NSE/BSE",
+            category="SME", 
+            exchange="BSE_SME/NSE_EMERGE",
             min_application_size=self._estimate_min_investment(price_band, lot_size),
             lot_size=lot_size,
-            retail_friendly=True
+            retail_friendly=False
         )
     
     def _extract_average_price(self, price_band: str) -> float:
