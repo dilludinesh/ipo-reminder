@@ -7,6 +7,7 @@ from .sources.chittorgarh import today_ipos_closing, format_email
 from .sources.official import get_official_ipos
 from .sources.moneycontrol import get_moneycontrol_ipos
 from .sources.fallback import get_fallback_ipos
+from .sources.zerodha import get_zerodha_ipos_closing_today
 from .emailer import send_email
 
 
@@ -23,9 +24,38 @@ def handler(dry_run=False):
     ist = now_utc + dt.timedelta(hours=5, minutes=30)
     today = ist.date()
 
-    # Try official sources first (SEBI, BSE, NSE) - most authoritative
-    ipos = get_official_ipos(today)
-    logger.info(f"Found {len(ipos)} IPO(s) closing today from official sources.")
+    # Try Zerodha first (most up-to-date and reliable for current IPOs)
+    zerodha_ipos = get_zerodha_ipos_closing_today(today)
+    logger.info(f"Found {len(zerodha_ipos)} IPO(s) closing today from Zerodha.")
+    
+    # Convert Zerodha IPOs to standard format
+    ipos = []
+    for z_ipo in zerodha_ipos:
+        # Convert to IPOInfo format for email
+        from .sources.chittorgarh import IPOInfo
+        ipo = IPOInfo(
+            name=z_ipo.name,
+            detail_url=None,
+            gmp_url=None,
+            open_date=z_ipo.open_date,
+            close_date=z_ipo.close_date,
+            price_band=z_ipo.price_range,
+            lot_size=None,
+            recommendation=f"IPO closes today - Listing on {z_ipo.listing_date}"
+        )
+        ipos.append(ipo)
+
+    # If no IPOs found from Zerodha, try official sources (SEBI, BSE, NSE)
+    if not ipos:
+        logger.info("No IPOs found from Zerodha, trying official sources...")
+        ipos = get_official_ipos(today)
+        logger.info(f"Found {len(ipos)} IPO(s) closing today from official sources.")
+    
+    # If no IPOs found from Zerodha, try official sources (SEBI, BSE, NSE)
+    if not ipos:
+        logger.info("No IPOs found from Zerodha, trying official sources...")
+        ipos = get_official_ipos(today)
+        logger.info(f"Found {len(ipos)} IPO(s) closing today from official sources.")
     
     # If no IPOs found, try Moneycontrol (reliable financial portal)
     if not ipos:
