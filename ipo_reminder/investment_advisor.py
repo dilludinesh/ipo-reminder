@@ -165,113 +165,44 @@ def get_market_sentiment() -> str:
 
 
 def format_investment_email(now_date: date, ipos: List) -> Tuple[str, str]:
-    """Format email with comprehensive investment advice."""
+    """Format simple email with just IPO names and APPLY/AVOID guidance."""
     
     # Create subject line
-    day_name = now_date.strftime("%A")
     formatted_date = now_date.strftime("%d %b %Y")
-    subject = f"IPO Investment Alert • {day_name}, {formatted_date}"
+    subject = f"IPO Alert • {formatted_date}"
     
     if not ipos:
-        body = f"""📊 IPO MARKET UPDATE - {formatted_date}
+        body = f"""No IPOs closing today ({formatted_date})
 
-No IPOs closing today. Market is quiet.
-
-💡 USE THIS TIME TO:
-• Research upcoming IPOs in your pipeline
-• Review your current portfolio allocation
-• Study sector trends and market conditions
-• Build cash reserves for quality opportunities
-
-📈 INVESTMENT TIP:
-Quality IPOs are rare. It's better to wait for the right opportunity than to invest in mediocre companies just because they're available.
-
----
-⚠️ This is for educational purposes. Consult your financial advisor for personalized advice.
+Market is quiet - good time to research upcoming opportunities.
 """
         return subject, body
     
-    # Build comprehensive investment email
-    lines = [f"📊 IPO INVESTMENT ALERT - {formatted_date}"]
-    lines.append(f"\n{len(ipos)} IPO(s) closing today - INVESTMENT ANALYSIS:\n")
+    # Simple, clean email format
+    lines = [f"IPOs closing today ({formatted_date}):\n"]
     
     for i, ipo in enumerate(ipos, 1):
         company_name = getattr(ipo, 'name', 'Unknown Company')
         price_band = getattr(ipo, 'price_band', 'Price TBA')
-        listing_date = getattr(ipo, 'listing_date', None) or \
-                      getattr(ipo, 'ipo_dates', None) or "TBA"
         
         # Get investment analysis
-        analysis = analyze_ipo_investment(company_name, price_band, listing_date=listing_date)
+        analysis = analyze_ipo_investment(company_name, price_band)
         
-        lines.append(f"{'='*60}")
-        lines.append(f"{i}. 🏢 {company_name}")
-        lines.append(f"💰 Price: {price_band}")
-        lines.append(f"📅 Listing: {listing_date}")
-        lines.append("")
-        
-        # Investment recommendation
-        rec_emoji = {
-            "STRONG BUY": "🚀",
-            "BUY": "✅", 
-            "HOLD": "⚠️",
-            "AVOID": "❌",
-            "STRONG AVOID": "🚫"
-        }.get(analysis.recommendation, "📊")
-        
-        lines.append(f"{rec_emoji} RECOMMENDATION: {analysis.recommendation}")
-        lines.append(f"🎯 Confidence: {analysis.confidence}")
-        lines.append(f"⚡ Risk Level: {analysis.risk_level}")
-        lines.append(f"📈 Investment Horizon: {analysis.investment_horizon.replace('_', ' ')}")
-        lines.append("")
-        
-        # Key factors
-        lines.append("🔍 KEY FACTORS:")
-        for factor, description in analysis.key_factors.items():
-            lines.append(f"  • {factor}: {description}")
-        lines.append("")
-        
-        # Investment reasoning
-        lines.append("💡 ANALYSIS:")
-        for reason in analysis.reasoning[:8]:  # Limit to most important points
-            lines.append(f"  {reason}")
-        lines.append("")
-        
-        # Specific investment advice
+        # Convert recommendation to simple APPLY/AVOID
         if analysis.recommendation in ["STRONG BUY", "BUY"]:
-            lines.append("💰 INVESTMENT ADVICE:")
-            lines.append("  • Consider for portfolio allocation")
-            lines.append("  • Start with smaller position, can increase if performs well")
-            lines.append("  • Good for long-term wealth creation")
+            action = "✅ APPLY"
         elif analysis.recommendation == "HOLD":
-            lines.append("⚖️ INVESTMENT ADVICE:")
-            lines.append("  • Suitable for moderate risk investors")
-            lines.append("  • Research thoroughly before investing")
-            lines.append("  • Consider waiting for better entry opportunities")
+            action = "⚠️ RESEARCH"
         else:
-            lines.append("⛔ INVESTMENT ADVICE:")
-            lines.append("  • High risk - avoid unless you're experienced")
-            lines.append("  • Better opportunities likely available elsewhere")
-            lines.append("  • Focus on quality companies instead")
+            action = "❌ AVOID"
         
+        lines.append(f"{i}. {company_name}")
+        lines.append(f"   Price: {price_band}")
+        lines.append(f"   Advice: {action}")
         lines.append("")
     
-    # Add market context
-    lines.append(get_market_sentiment())
-    
-    # Add closing advice
-    lines.append("""
-📋 FINAL CHECKLIST BEFORE INVESTING:
-□ Read the company's prospectus completely
-□ Check company's debt levels and cash flow
-□ Compare with listed peers in same sector  
-□ Ensure this fits your risk profile
-□ Don't invest more than you can afford to lose
-□ Have a clear exit strategy
-
-⚠️ DISCLAIMER: This analysis is for educational purposes only. Past performance doesn't guarantee future results. Please consult with a qualified financial advisor before making investment decisions.
-
-🎯 Remember: It's better to miss a good opportunity than to lose money on a bad one!""")
+    lines.append("---")
+    lines.append("Do your own research before investing.")
     
     body = "\n".join(lines)
     return subject, body
