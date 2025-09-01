@@ -83,35 +83,48 @@ class DeepIPOAnalyzer:
         """Perform comprehensive IPO analysis."""
         logger.info(f"Starting deep analysis for {company_name}")
         
-        # Step 1: Extract basic IPO details
-        ipo_details = self._extract_ipo_details(company_name, price_band)
-        
-        # Step 2: Get company financials
-        financials = self._get_company_financials(company_name)
-        
-        # Step 3: Industry analysis
-        industry_analysis = self._analyze_industry(company_name)
-        
-        # Step 4: Valuation analysis
-        valuation = self._perform_valuation_analysis(ipo_details, financials, industry_analysis)
-        
-        # Step 5: Risk assessment
-        risk_analysis = self._assess_risks(ipo_details, financials, industry_analysis)
-        
-        # Step 6: Management and business model evaluation
-        management_analysis = self._evaluate_management_and_business(company_name)
-        
-        # Step 7: Competitive analysis
-        competitive_analysis = self._analyze_competitive_position(company_name, industry_analysis)
-        
-        # Step 8: Final recommendation synthesis
-        final_analysis = self._synthesize_final_recommendation(
-            ipo_details, financials, industry_analysis, valuation,
-            risk_analysis, management_analysis, competitive_analysis
-        )
-        
-        logger.info(f"Deep analysis completed for {company_name}: {final_analysis.recommendation}")
-        return final_analysis
+        try:
+            # Step 1: Extract basic IPO details
+            ipo_details = self._extract_ipo_details(company_name, price_band)
+            
+            # Step 2: Get company financials
+            financials = self._get_company_financials(company_name)
+            
+            # Step 3: Industry analysis
+            industry_analysis = self._analyze_industry(company_name)
+            
+            # Step 4: Valuation analysis
+            valuation = self._perform_valuation_analysis(ipo_details, financials, industry_analysis)
+            
+            # Step 5: Risk assessment
+            risk_analysis = self._assess_risks(ipo_details, financials, industry_analysis)
+            
+            # Step 6: Management and business model evaluation
+            management_analysis = self._evaluate_management_and_business(company_name)
+            
+            # Step 7: Competitive analysis
+            competitive_analysis = self._analyze_competitive_position(company_name, industry_analysis)
+            
+            # Step 8: Final recommendation synthesis
+            final_analysis = self._synthesize_final_recommendation(
+                ipo_details, financials, industry_analysis, valuation,
+                risk_analysis, management_analysis, competitive_analysis
+            )
+            
+            logger.info(f"Deep analysis completed for {company_name}: {final_analysis.recommendation}")
+            return final_analysis
+            
+        except Exception as e:
+            logger.error(f"Error in deep analysis for {company_name}: {e}")
+            # Return a conservative default analysis
+            return RockSolidAnalysis(
+                recommendation="AVOID",
+                confidence_score=20,
+                risk_score=80,
+                key_strengths=[],
+                key_risks=["Analysis failed - high uncertainty"],
+                final_verdict="Unable to complete analysis - exercise caution"
+            )
     
     def _extract_ipo_details(self, company_name: str, price_band: str) -> IPODetails:
         """Extract detailed IPO information from multiple sources."""

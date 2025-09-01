@@ -161,107 +161,59 @@ def categorize_ipos(ipos: List) -> Tuple[List, List]:
     return main_board_ipos, sme_ipos
 
 
-def format_retail_investor_email(now_date, ipos: List) -> Tuple[str, str]:
-    """Format email prioritizing Main Board IPOs for retail investors."""
+def format_personal_guide_email(now_date, ipos: List) -> Tuple[str, str]:
+    """Format clean, focused email as personal investment guide."""
     from datetime import date
     from .deep_analyzer import DeepIPOAnalyzer
-    
+
     # Create subject line
     formatted_date = now_date.strftime("%d %b %Y")
-    subject = f"IPO Alert • Retail Focus • {formatted_date}"
-    
+    subject = f"IPO Investment Guide • {formatted_date}"
+
     if not ipos:
         body = f"""No IPOs closing today ({formatted_date})
 
-Perfect time to research upcoming Main Board opportunities.
+Your investment guide: Stay patient, focus on quality opportunities.
 """
         return subject, body
-    
-    # Categorize IPOs
-    main_board_ipos, sme_ipos = categorize_ipos(ipos)
-    
+
     analyzer = DeepIPOAnalyzer()
-    lines = [f"IPO Analysis for Retail Investors - {formatted_date}\n"]
-    
-    # MAIN BOARD IPOs (Primary Focus)
-    if main_board_ipos:
-        lines.append("🏛️ MAIN BOARD IPOs (PRIMARY FOCUS)")
-        lines.append("=" * 40)
-        
-        for i, ipo in enumerate(main_board_ipos, 1):
-            company_name = getattr(ipo, 'name', 'Unknown Company')
-            price_band = getattr(ipo, 'price_band', None) or getattr(ipo, 'price_range', 'Price TBA')
-            
-            # Perform deep analysis
-            analysis = analyzer.analyze_ipo_comprehensive(company_name, price_band)
-            
-            # Convert to action
-            if analysis.recommendation in ["STRONG_BUY", "BUY"]:
-                action = "✅ APPLY"
-                emoji = "🚀" if analysis.recommendation == "STRONG_BUY" else "✅"
-            elif analysis.recommendation == "HOLD":
-                action = "⚠️ RESEARCH"
-                emoji = "⚠️"
-            else:
-                action = "❌ AVOID"
-                emoji = "❌"
-            
-            lines.append(f"\n{i}. {company_name}")
-            lines.append(f"   Price: {price_band}")
-            lines.append(f"   Exchange: {ipo.category.exchange}")
-            lines.append(f"   Min Investment: ~₹{ipo.category.min_application_size:,}")
-            lines.append(f"   {emoji} Advice: {action}")
-            lines.append(f"   Confidence: {analysis.confidence_score}% | Risk: {analysis.risk_score}/100")
-            
-            # Add key insight
-            if analysis.key_strengths:
-                lines.append(f"   💪 {analysis.key_strengths[0]}")
-            if analysis.key_risks:
-                lines.append(f"   ⚠️ {analysis.key_risks[0]}")
-    else:
-        lines.append("🏛️ MAIN BOARD IPOs: None closing today")
-    
-    # SME IPOs (Secondary Focus)
-    if sme_ipos:
-        lines.append(f"\n\n🏢 SME IPOs (HIGHER RISK - SECONDARY FOCUS)")
-        lines.append("=" * 45)
-        lines.append("⚠️ SME IPOs are higher risk - invest only small amounts")
-        
-        for i, ipo in enumerate(sme_ipos, 1):
-            company_name = getattr(ipo, 'name', 'Unknown Company')
-            price_band = getattr(ipo, 'price_band', None) or getattr(ipo, 'price_range', 'Price TBA')
-            
-            # Perform analysis (with extra caution for SME)
-            analysis = analyzer.analyze_ipo_comprehensive(company_name, price_band)
-            
-            # More conservative for SME
-            if analysis.recommendation in ["STRONG_BUY", "BUY"]:
-                action = "⚠️ SMALL POSITION" 
-                emoji = "⚠️"
-            elif analysis.recommendation == "HOLD":
-                action = "🔍 RESEARCH DEEPLY"
-                emoji = "🔍"
-            else:
-                action = "❌ AVOID"
-                emoji = "❌"
-            
-            lines.append(f"\n{i}. {company_name}")
-            lines.append(f"   Price: {price_band}")
-            lines.append(f"   Exchange: {ipo.category.exchange}")
-            lines.append(f"   Min Investment: ~₹{ipo.category.min_application_size:,}")
-            lines.append(f"   {emoji} SME Advice: {action}")
-            lines.append(f"   Risk Score: {analysis.risk_score}/100 (SME = Higher Risk)")
-    
-    # Investment guidance for retail investors
-    lines.append(f"\n\n💡 RETAIL INVESTOR GUIDANCE:")
-    lines.append("• Focus primarily on Main Board IPOs (lower risk)")
-    lines.append("• SME IPOs: Only invest small amounts you can afford to lose")
-    lines.append("• Main Board IPOs have better liquidity and transparency")
-    lines.append("• Diversify - don't put all money in one IPO")
-    
-    lines.append(f"\n---")
-    lines.append("Analysis based on fundamental research.")
-    lines.append("Main Board IPOs prioritized for retail investors.")
-    
+    lines = [f"Your Personal IPO Investment Guide - {formatted_date}\n"]
+
+    for i, ipo in enumerate(ipos, 1):
+        company_name = getattr(ipo, 'name', 'Unknown Company')
+        price_band = getattr(ipo, 'price_band', None) or getattr(ipo, 'price_range', 'Price TBA')
+
+        # Perform deep analysis
+        analysis = analyzer.analyze_ipo_comprehensive(company_name, price_band)
+
+        # Convert to clear action
+        if analysis.recommendation in ["STRONG_BUY", "BUY"]:
+            action = "✅ APPLY"
+            confidence_text = f"High confidence ({analysis.confidence_score}%)"
+        elif analysis.recommendation == "HOLD":
+            action = "⚠️ HOLD"
+            confidence_text = f"Moderate confidence ({analysis.confidence_score}%)"
+        else:
+            action = "❌ AVOID"
+            confidence_text = f"Strong avoid ({analysis.confidence_score}%)"
+
+        lines.append(f"{i}. {company_name}")
+        lines.append(f"   Price: {price_band}")
+        lines.append(f"   My Recommendation: {action}")
+        lines.append(f"   Analysis Confidence: {confidence_text}")
+
+        # Add key insight (just one, most important)
+        if analysis.key_strengths:
+            lines.append(f"   Key Strength: {analysis.key_strengths[0]}")
+        elif analysis.key_risks:
+            lines.append(f"   Key Risk: {analysis.key_risks[0]}")
+
+        lines.append("")
+
+    lines.append("---")
+    lines.append("Your personal investment guide - based on deep fundamental analysis.")
+    lines.append("No guesswork, just clear guidance for your portfolio decisions.")
+
     body = "\n".join(lines)
     return subject, body

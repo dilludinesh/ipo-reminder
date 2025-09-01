@@ -29,15 +29,15 @@ def get_zerodha_ipos() -> List[ZerodhaIPO]:
     """Fetch IPO data from Zerodha."""
     logger.info("Fetching IPO data from Zerodha...")
     
-    headers = {
-        "User-Agent": USER_AGENT,
-        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-        "Accept-Language": "en-US,en;q=0.5",
-        "Accept-Encoding": "gzip, deflate",
-        "Connection": "keep-alive"
-    }
-    
     try:
+        headers = {
+            "User-Agent": USER_AGENT,
+            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+            "Accept-Language": "en-US,en;q=0.5",
+            "Accept-Encoding": "gzip, deflate",
+            "Connection": "keep-alive"
+        }
+        
         response = requests.get("https://zerodha.com/ipo", headers=headers, timeout=REQUEST_TIMEOUT)
         response.raise_for_status()
         
@@ -54,54 +54,59 @@ def get_zerodha_ipos() -> List[ZerodhaIPO]:
         rows = table.find_all('tr')
         
         for row in rows[1:]:  # Skip header row
-            cells = row.find_all(['td', 'th'])
-            if len(cells) >= 4:
-                try:
-                    # Extract data from cells
-                    name_cell = cells[1] if len(cells) > 1 else cells[0]
-                    company_info = name_cell.get_text(strip=True)
+            try:
+                cells = row.find_all(['td', 'th'])
+                if len(cells) >= 4:
+                    try:
+                        # Extract data from cells
+                        name_cell = cells[1] if len(cells) > 1 else cells[0]
+                        company_info = name_cell.get_text(strip=True)
+                        
+                        # Extract symbol and name
+                        symbol_match = re.search(r'^([A-Z]+)(?:SME)?(.+)', company_info)
+                        if symbol_match:
+                            symbol = symbol_match.group(1)
+                            name = symbol_match.group(2).strip()
+                        else:
+                            symbol = ""
+                            name = company_info
+                        
+                        # Extract dates and other info
+                        ipo_dates = cells[2].get_text(strip=True) if len(cells) > 2 else ""
+                        listing_date = cells[3].get_text(strip=True) if len(cells) > 3 else ""
+                        price_range = cells[4].get_text(strip=True) if len(cells) > 4 else ""
+                        
+                        # Parse open and close dates from IPO dates string
+                        open_date, close_date = _parse_ipo_dates(ipo_dates)
+                        
+                        ipo = ZerodhaIPO(
+                            name=name,
+                            symbol=symbol,
+                            ipo_dates=ipo_dates,
+                            listing_date=listing_date,
+                            price_range=price_range,
+                            open_date=open_date,
+                            close_date=close_date
+                        )
+                        
+                        ipos.append(ipo)
+                        
+                    except Exception as e:
+                        logger.warning(f"Error parsing IPO row: {e}")
+                        continue
                     
-                    # Extract symbol and name
-                    symbol_match = re.search(r'^([A-Z]+)(?:SME)?(.+)', company_info)
-                    if symbol_match:
-                        symbol = symbol_match.group(1)
-                        name = symbol_match.group(2).strip()
-                    else:
-                        symbol = ""
-                        name = company_info
-                    
-                    # Extract dates and other info
-                    ipo_dates = cells[2].get_text(strip=True) if len(cells) > 2 else ""
-                    listing_date = cells[3].get_text(strip=True) if len(cells) > 3 else ""
-                    price_range = cells[4].get_text(strip=True) if len(cells) > 4 else ""
-                    
-                    # Parse open and close dates from IPO dates string
-                    open_date, close_date = _parse_ipo_dates(ipo_dates)
-                    
-                    ipo = ZerodhaIPO(
-                        name=name,
-                        symbol=symbol,
-                        ipo_dates=ipo_dates,
-                        listing_date=listing_date,
-                        price_range=price_range,
-                        open_date=open_date,
-                        close_date=close_date
-                    )
-                    
-                    ipos.append(ipo)
-                    
-                except Exception as e:
-                    logger.warning(f"Error parsing IPO row: {e}")
-                    continue
+            except Exception as e:
+                logger.warning(f"Error processing table row: {e}")
+                continue
         
         logger.info(f"Successfully fetched {len(ipos)} IPOs from Zerodha")
         return ipos
         
     except requests.RequestException as e:
-        logger.error(f"Failed to fetch Zerodha IPO data: {e}")
+        logger.error(f"Network error fetching Zerodha IPO data: {e}")
         return []
     except Exception as e:
-        logger.error(f"Error parsing Zerodha IPO data: {e}")
+        logger.error(f"Unexpected error parsing Zerodha IPO data: {e}")
         return []
 
 
