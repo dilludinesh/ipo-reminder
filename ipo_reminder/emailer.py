@@ -6,7 +6,7 @@ from datetime import datetime
 from email.message import EmailMessage
 from typing import List, Optional
 
-from .config import SENDER_EMAIL, RECIPIENT_EMAIL, validate_email_config
+from .config import SENDER_EMAIL, SENDER_PASSWORD, RECIPIENT_EMAIL, validate_email_config
 
 logger = logging.getLogger(__name__)
 
@@ -39,7 +39,7 @@ def send_email(
         recipients = [RECIPIENT_EMAIL]
 
     sender = os.getenv('SENDER_EMAIL') or SENDER_EMAIL
-    password = os.getenv('SENDER_PASSWORD')
+    password = os.getenv('SENDER_PASSWORD') or SENDER_PASSWORD
 
     if not sender or not password:
         logger.error("SMTP configured but SENDER_EMAIL or SENDER_PASSWORD is missing")
@@ -88,6 +88,14 @@ def send_email(
         logger.info(f"Email sent via SMTP to {', '.join(recipients)}")
         _append_email_log("SMTP_SENT", recipients[0], subject)
         return True
+    except smtplib.SMTPAuthenticationError as e:
+        logger.error(f"SMTP authentication failed: {e}")
+        _append_email_log("SMTP_AUTH_FAILED", recipients[0], subject, str(e))
+        return False
+    except smtplib.SMTPConnectError as e:
+        logger.error(f"SMTP connection failed: {e}")
+        _append_email_log("SMTP_CONNECT_FAILED", recipients[0], subject, str(e))
+        return False
     except Exception as e:
         logger.error(f"SMTP send failed: {e}")
         _append_email_log("SMTP_FAILED", recipients[0], subject, str(e))
