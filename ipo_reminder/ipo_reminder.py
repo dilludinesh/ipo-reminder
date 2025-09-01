@@ -8,7 +8,7 @@ from .sources.official import get_official_ipos
 from .sources.moneycontrol import get_moneycontrol_ipos
 from .sources.fallback import get_fallback_ipos
 from .sources.zerodha import get_zerodha_ipos_closing_today
-from .investment_advisor import format_investment_email
+from .deep_analyzer import format_rock_solid_email
 from .emailer import send_email
 
 
@@ -76,7 +76,7 @@ def handler(dry_run=False):
         ipos = get_fallback_ipos(today)
         logger.info(f"Found {len(ipos)} IPO(s) closing today from fallback sources.")
     
-    subject, body = format_investment_email(today, ipos)
+    subject, body = format_rock_solid_email(today, ipos)
     # No HTML - just simple plain text email
     
     if dry_run:
