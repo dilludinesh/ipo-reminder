@@ -60,16 +60,31 @@ def get_zerodha_ipos() -> List[ZerodhaIPO]:
                     try:
                         # Extract data from cells
                         name_cell = cells[1] if len(cells) > 1 else cells[0]
-                        company_info = name_cell.get_text(strip=True)
                         
-                        # Extract symbol and name
-                        symbol_match = re.search(r'^([A-Z]+)(?:SME)?(.+)', company_info)
-                        if symbol_match:
-                            symbol = symbol_match.group(1)
-                            name = symbol_match.group(2).strip()
-                        else:
-                            symbol = ""
-                            name = company_info
+                        # Parse the HTML structure to get clean company name
+                        company_name = ""
+                        symbol = ""
+                        
+                        # Look for the ipo-name span which contains the actual company name
+                        ipo_name_span = name_cell.find('span', class_='ipo-name')
+                        if ipo_name_span:
+                            company_name = ipo_name_span.get_text(strip=True)
+                        
+                        # Look for the ipo-symbol span
+                        ipo_symbol_span = name_cell.find('span', class_='ipo-symbol')
+                        if ipo_symbol_span:
+                            # Extract just the symbol text, excluding SME type
+                            symbol_text = ipo_symbol_span.get_text(strip=True)
+                            # Remove SME from symbol if present
+                            symbol = re.sub(r'\bSME\b', '', symbol_text, flags=re.I).strip()
+                        
+                        # If we couldn't parse the spans, fall back to raw text
+                        if not company_name:
+                            raw_text = name_cell.get_text(strip=True)
+                            company_name = _extract_company_name_from_raw(raw_text)
+                        
+                        # Clean the company name
+                        name = _clean_company_name(company_name)
                         
                         # Extract dates and other info
                         ipo_dates = cells[2].get_text(strip=True) if len(cells) > 2 else ""
@@ -171,3 +186,43 @@ def get_zerodha_ipos_closing_today(target_date: date) -> List[ZerodhaIPO]:
     
     logger.info(f"Found {len(closing_today)} IPOs closing on {target_date} from Zerodha")
     return closing_today
+
+
+def _clean_company_name(name: str) -> str:
+    """Clean and format company name for better display."""
+    if not name:
+        return name
+    
+    # Capitalize words properly (Title Case)
+    name = name.title()
+    
+    # Handle special cases for company name formatting
+    # Fix common capitalization issues
+    name = re.sub(r'\bLtd\b', 'Ltd', name)
+    name = re.sub(r'\bPvt\b', 'Pvt', name)
+    name = re.sub(r'\bInc\b', 'Inc', name)
+    name = re.sub(r'\bCorp\b', 'Corp', name)
+    
+    return name
+
+
+def _extract_company_name_from_raw(raw_text: str) -> str:
+    """Extract company name from raw concatenated text as fallback."""
+    if not raw_text:
+        return ""
+    
+    # Try to find patterns that look like company names
+    # Look for title-case words that aren't all caps
+    words = raw_text.split()
+    company_words = []
+    
+    for word in words:
+        # Skip if it's all caps and looks like a symbol
+        if word.isupper() and len(word) <= 10:
+            continue
+        # Skip if it contains 'SME'
+        if 'SME' in word.upper():
+            continue
+        company_words.append(word)
+    
+    return ' '.join(company_words) if company_words else raw_text
