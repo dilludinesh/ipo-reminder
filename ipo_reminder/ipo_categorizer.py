@@ -161,59 +161,93 @@ def categorize_ipos(ipos: List) -> Tuple[List, List]:
     return main_board_ipos, sme_ipos
 
 
-def format_personal_guide_email(now_date, ipos: List) -> Tuple[str, str]:
+def format_personal_guide_email(now_date, ipos: List) -> Tuple[str, str, str]:
     """Format clean, focused email as personal investment guide."""
-    from datetime import date
+    return format_ipo_email_html(now_date, ipos)
+
+
+def format_ipo_email_html(today_date, ipos: List) -> Tuple[str, str, str]:
+    """Formats a professional HTML email with IPO recommendations."""
     from .deep_analyzer import DeepIPOAnalyzer
 
-    # Create subject line
-    formatted_date = now_date.strftime("%d %b %Y")
+    formatted_date = today_date.strftime("%d %b %Y")
     subject = f"IPO Investment Guide • {formatted_date}"
 
     if not ipos:
-        body = f"""No IPOs closing today ({formatted_date})
-
-Your investment guide: Stay patient, focus on quality opportunities.
-"""
-        return subject, body
+        text_body = f"No IPOs closing today ({formatted_date}). Your investment guide: Stay patient, focus on quality opportunities."
+        html_body = f"""
+        <p>No IPOs closing today ({formatted_date}).</p>
+        <p><strong>Your investment guide:</strong> Stay patient and focus on quality opportunities.</p>
+        """
+        return subject, text_body, html_body
 
     analyzer = DeepIPOAnalyzer()
-    lines = [f"Your Personal IPO Investment Guide - {formatted_date}\n"]
-
+    
+    # --- Text Body Generation ---
+    text_lines = [f"Your Personal IPO Investment Guide - {formatted_date}\n"]
     for i, ipo in enumerate(ipos, 1):
         company_name = getattr(ipo, 'name', 'Unknown Company')
         price_band = getattr(ipo, 'price_band', None) or getattr(ipo, 'price_range', 'Price TBA')
-
-        # Perform deep analysis
         analysis = analyzer.analyze_ipo_comprehensive(company_name, price_band)
 
-        # Convert to clear action
-        if analysis.recommendation in ["STRONG_BUY", "BUY"]:
-            action = "✅ APPLY"
-            confidence_text = f"High confidence ({analysis.confidence_score}%)"
-        elif analysis.recommendation == "HOLD":
-            action = "⚠️ HOLD"
-            confidence_text = f"Moderate confidence ({analysis.confidence_score}%)"
-        else:
-            action = "❌ AVOID"
-            confidence_text = f"Strong avoid ({analysis.confidence_score}%)"
+        action_map = {
+            "STRONG_BUY": "✅ APPLY", "BUY": "✅ APPLY",
+            "AVOID": "❌ AVOID", "STRONG_AVOID": "❌ AVOID"
+        }
+        action = action_map.get(analysis.recommendation, "❌ AVOID")
+        
+        confidence_text = f"{analysis.confidence_score}% confidence"
+        insight = analysis.key_strengths[0] if analysis.key_strengths else (analysis.key_risks[0] if analysis.key_risks else "No specific insight.")
 
-        lines.append(f"{i}. {company_name}")
-        lines.append(f"   Price: {price_band}")
-        lines.append(f"   My Recommendation: {action}")
-        lines.append(f"   Analysis Confidence: {confidence_text}")
+        text_lines.extend([
+            f"{i}. {company_name}",
+            f"   Price: {price_band}",
+            f"   My Recommendation: {action} ({confidence_text})",
+            f"   Key Insight: {insight}\n"
+        ])
+    text_lines.append("---\nYour personal investment guide - based on deep fundamental analysis.")
+    text_body = "\n".join(text_lines)
 
-        # Add key insight (just one, most important)
-        if analysis.key_strengths:
-            lines.append(f"   Key Strength: {analysis.key_strengths[0]}")
-        elif analysis.key_risks:
-            lines.append(f"   Key Risk: {analysis.key_risks[0]}")
+    # --- HTML Body Generation ---
+    html_parts = [f"""
+    <div style="font-family: Arial, sans-serif; color: #333; max-width: 600px; margin: auto; border: 1px solid #ddd; border-radius: 8px; overflow: hidden;">
+        <div style="background-color: #4CAF50; color: white; padding: 20px; text-align: center;">
+            <h1 style="margin: 0;">IPO Investment Guide</h1>
+            <p style="margin: 0;">{formatted_date}</p>
+        </div>
+        <div style="padding: 20px;">
+    """]
 
-        lines.append("")
+    for ipo in ipos:
+        company_name = getattr(ipo, 'name', 'Unknown Company')
+        price_band = getattr(ipo, 'price_band', None) or getattr(ipo, 'price_range', 'Price TBA')
+        analysis = analyzer.analyze_ipo_comprehensive(company_name, price_band)
 
-    lines.append("---")
-    lines.append("Your personal investment guide - based on deep fundamental analysis.")
-    lines.append("No guesswork, just clear guidance for your portfolio decisions.")
+        rec_map = {
+            "STRONG_BUY": ("#28a745", "APPLY"), "BUY": ("#28a745", "APPLY"),
+            "AVOID": ("#dc3545", "AVOID"), "STRONG_AVOID": ("#dc3545", "AVOID")
+        }
+        rec_color, rec_text = rec_map.get(analysis.recommendation, ("#dc3545", "AVOID"))
+        
+        insight = analysis.key_strengths[0] if analysis.key_strengths else (analysis.key_risks[0] if analysis.key_risks else "Not available.")
 
-    body = "\n".join(lines)
-    return subject, body
+        html_parts.append(f"""
+        <div style="margin-bottom: 20px; padding: 15px; border-left: 5px solid {rec_color}; background-color: #f9f9f9; border-radius: 5px;">
+            <h3 style="margin-top: 0; margin-bottom: 10px; color: #444;">{company_name}</h3>
+            <p style="margin: 5px 0;"><strong>Price:</strong> {price_band}</p>
+            <p style="margin: 5px 0;"><strong>Recommendation:</strong> <span style="color: {rec_color}; font-weight: bold;">{rec_text}</span></p>
+            <p style="margin: 5px 0;"><strong>Confidence:</strong> {analysis.confidence_score}%</p>
+            <p style="margin: 5px 0;"><strong>Key Insight:</strong> {insight}</p>
+        </div>
+        """)
+
+    html_parts.append("""
+        </div>
+        <div style="background-color: #f2f2f2; color: #666; padding: 15px; text-align: center; font-size: 12px;">
+            <p style="margin: 0;">This guide is based on automated fundamental analysis. Always do your own research.</p>
+        </div>
+    </div>
+    """)
+    html_body = "".join(html_parts)
+
+    return subject, text_body, html_body

@@ -91,7 +91,7 @@ def handler(dry_run=False):
             logger.warning(f"Error fetching from fallback sources: {e}")
             ipos = []
     
-    subject, body = format_personal_guide_email(today, ipos)
+    subject, body, html_body = format_personal_guide_email(today, ipos)
     # No HTML - just simple plain text email
     
     if dry_run:
@@ -99,10 +99,12 @@ def handler(dry_run=False):
         print(f"Subject: {subject}")
         print(f"Recipients: {os.getenv('RECIPIENT_EMAIL', 'Not configured')}")
         print(f"Body preview: {body[:200]}...")
+        if html_body:
+            print(f"HTML Body preview: {html_body[:200]}...")
         logger.info("DRY RUN completed - no email sent.")
     else:
         try:
-            send_email(subject, body, html_body=None)  # No HTML
+            send_email(subject, body, html_body=html_body)
             logger.info("IPO Reminder finished sending email.")
         except Exception as e:
             logger.error(f"Failed to send email: {e}")

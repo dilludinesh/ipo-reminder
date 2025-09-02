@@ -55,7 +55,7 @@ class IndustryAnalysis:
 @dataclass
 class RockSolidAnalysis:
     """Comprehensive IPO analysis result."""
-    recommendation: str  # STRONG_BUY, BUY, HOLD, AVOID, STRONG_AVOID
+    recommendation: str  # STRONG_BUY, BUY, AVOID, STRONG_AVOID
     confidence_score: int  # 1-100
     risk_score: int  # 1-100 (higher = riskier)
     fair_value_estimate: Optional[float] = None
@@ -167,6 +167,18 @@ class DeepIPOAnalyzer:
         # Advanced sector classification
         name_lower = company_name.lower()
         
+        # Paper industry
+        if 'paper' in name_lower:
+            return IndustryAnalysis(
+                sector="Paper",
+                industry_growth_rate=6.0,
+                market_size=80000.0,
+                competition_level="MEDIUM",
+                regulatory_risk="LOW",
+                cyclical_nature=True,
+                entry_barriers="MEDIUM"
+            )
+
         # Healthcare/Pharma (check first as it's more specific)
         if any(word in name_lower for word in ['healthcare', 'pharma', 'medical', 'bio', 'drug', 'hospital']):
             return IndustryAnalysis(
@@ -179,8 +191,8 @@ class DeepIPOAnalyzer:
                 entry_barriers="HIGH"
             )
         
-        # Technology sector analysis
-        elif any(word in name_lower for word in ['tech', 'software', 'digital', 'cyber', 'data', 'ai', 'automation', 'saas']):
+        # Technology sector analysis (avoiding generic 'tech' in unrelated industries)
+        if any(word in name_lower for word in ['software', 'digital', 'automation', 'saas', 'fintech', 'cyber', 'data', 'ai']) or ('tech' in name_lower and 'paper' not in name_lower):
             return IndustryAnalysis(
                 sector="Technology",
                 industry_growth_rate=15.0,  # Annual growth %
@@ -428,15 +440,9 @@ class DeepIPOAnalyzer:
         elif score >= 60:
             recommendation = "BUY"
             verdict = "Good investment opportunity with manageable risks"
-        elif score >= 40:
-            recommendation = "HOLD"
-            verdict = "Mixed signals - requires careful evaluation"
-        elif score >= 25:
-            recommendation = "AVOID"
-            verdict = "Significant risks outweigh potential benefits"
         else:
-            recommendation = "STRONG_AVOID"
-            verdict = "High risk investment with poor fundamentals"
+            recommendation = "AVOID"
+            verdict = "Risks outweigh potential rewards. Better to avoid."
         
         # Adjust confidence based on data availability and analysis quality
         if not financials.revenue and not financials.profit:
