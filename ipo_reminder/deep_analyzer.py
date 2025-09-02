@@ -163,84 +163,107 @@ class DeepIPOAnalyzer:
         return financials
     
     def _analyze_industry(self, company_name: str) -> IndustryAnalysis:
-        """Comprehensive industry and sector analysis."""
-        # Advanced sector classification
+        """Comprehensive industry and sector analysis with enhanced classification."""
+        # Advanced sector classification with more granular categories
         name_lower = company_name.lower()
-        
-        # Paper industry
+
+        # Technology & Software (highest growth, lowest cyclicality)
+        if any(word in name_lower for word in [
+            'software', 'digital', 'automation', 'saas', 'fintech', 'cyber',
+            'data', 'ai', 'machine learning', 'cloud', 'internet', 'tech',
+            'information technology', 'it services', 'consulting services'
+        ]) or ('tech' in name_lower and 'paper' not in name_lower):
+            return IndustryAnalysis(
+                sector="Technology & IT",
+                industry_growth_rate=18.0,  # High growth sector
+                market_size=80000.0,
+                competition_level="HIGH",
+                regulatory_risk="MEDIUM",
+                cyclical_nature=False,
+                entry_barriers="MEDIUM"
+            )
+
+        # Healthcare/Pharma (defensive, stable growth)
+        if any(word in name_lower for word in [
+            'healthcare', 'pharma', 'medical', 'bio', 'drug', 'hospital',
+            'pharmaceutical', 'biotech', 'diagnostics', 'health', 'medicine',
+            'life sciences', 'clinical'
+        ]):
+            return IndustryAnalysis(
+                sector="Healthcare & Pharma",
+                industry_growth_rate=14.0,
+                market_size=75000.0,
+                competition_level="MEDIUM",
+                regulatory_risk="HIGH",
+                cyclical_nature=False,
+                entry_barriers="HIGH"
+            )
+
+        # Financial Services (regulated, interest rate sensitive)
+        elif any(word in name_lower for word in [
+            'bank', 'finance', 'insurance', 'mutual', 'capital', 'nbfc',
+            'financial services', 'investment', 'securities', 'wealth',
+            'asset management', 'credit', 'lending'
+        ]):
+            return IndustryAnalysis(
+                sector="Financial Services",
+                industry_growth_rate=12.0,
+                market_size=150000.0,
+                competition_level="HIGH",
+                regulatory_risk="VERY_HIGH",
+                cyclical_nature=True,
+                entry_barriers="HIGH"
+            )
+
+        # Paper & Packaging (cyclical, commodity dependent)
         if 'paper' in name_lower:
             return IndustryAnalysis(
-                sector="Paper",
+                sector="Paper & Packaging",
                 industry_growth_rate=6.0,
-                market_size=80000.0,
+                market_size=35000.0,
                 competition_level="MEDIUM",
                 regulatory_risk="LOW",
                 cyclical_nature=True,
                 entry_barriers="MEDIUM"
             )
 
-        # Healthcare/Pharma (check first as it's more specific)
-        if any(word in name_lower for word in ['healthcare', 'pharma', 'medical', 'bio', 'drug', 'hospital']):
+        # Engineering & Infrastructure (government dependent)
+        elif any(word in name_lower for word in [
+            'engineering', 'construction', 'infrastructure', 'projects',
+            'civil', 'mechanical', 'electrical', 'contracting', 'roads',
+            'bridges', 'railways', 'metro', 'power transmission'
+        ]):
             return IndustryAnalysis(
-                sector="Healthcare",
-                industry_growth_rate=12.0,
-                market_size=80000.0,
-                competition_level="MEDIUM",
-                regulatory_risk="HIGH",
-                cyclical_nature=False,
-                entry_barriers="HIGH"
-            )
-        
-        # Technology sector analysis (avoiding generic 'tech' in unrelated industries)
-        if any(word in name_lower for word in ['software', 'digital', 'automation', 'saas', 'fintech', 'cyber', 'data', 'ai']) or ('tech' in name_lower and 'paper' not in name_lower):
-            return IndustryAnalysis(
-                sector="Technology",
-                industry_growth_rate=15.0,  # Annual growth %
-                market_size=50000.0,  # Crores
-                competition_level="HIGH",
-                regulatory_risk="LOW",
-                cyclical_nature=False,
-                entry_barriers="MEDIUM"
-            )
-        
-        # Financial Services
-        elif any(word in name_lower for word in ['bank', 'finance', 'insurance', 'mutual', 'capital', 'nbfc']):
-            return IndustryAnalysis(
-                sector="Financial Services",
-                industry_growth_rate=10.0,
-                market_size=200000.0,
+                sector="Engineering & Infrastructure",
+                industry_growth_rate=8.0,
+                market_size=120000.0,
                 competition_level="HIGH",
                 regulatory_risk="HIGH",
                 cyclical_nature=True,
-                entry_barriers="HIGH"
+                entry_barriers="MEDIUM"
             )
-        
-        # Manufacturing/Industrial
-        elif any(word in name_lower for word in ['manufacturing', 'industrial', 'auto', 'steel', 'chemical']):
+
+        # Manufacturing & Industrial (cyclical, cost sensitive)
+        elif any(word in name_lower for word in [
+            'manufacturing', 'industrial', 'auto', 'automotive', 'steel',
+            'chemical', 'cement', 'glass', 'rubber', 'plastic', 'metal',
+            'machinery', 'equipment', 'components'
+        ]):
             return IndustryAnalysis(
-                sector="Manufacturing",
-                industry_growth_rate=8.0,
-                market_size=150000.0,
+                sector="Manufacturing & Industrial",
+                industry_growth_rate=7.0,
+                market_size=200000.0,
                 competition_level="HIGH",
                 regulatory_risk="MEDIUM",
                 cyclical_nature=True,
                 entry_barriers="MEDIUM"
             )
-        
-        # Infrastructure/Engineering
-        elif any(word in name_lower for word in ['engineering', 'construction', 'infrastructure', 'projects']):
-            return IndustryAnalysis(
-                sector="Infrastructure",
-                industry_growth_rate=6.0,
-                market_size=120000.0,
-                competition_level="HIGH",
-                regulatory_risk="HIGH",
-                cyclical_nature=True,
-                entry_barriers="LOW"
-            )
-        
-        # Real Estate
-        elif any(word in name_lower for word in ['real estate', 'property', 'housing', 'land']):
+
+        # Real Estate & Construction (interest rate sensitive)
+        elif any(word in name_lower for word in [
+            'real estate', 'property', 'housing', 'construction', 'land',
+            'residential', 'commercial', 'developers', 'builders'
+        ]):
             return IndustryAnalysis(
                 sector="Real Estate",
                 industry_growth_rate=5.0,
@@ -250,11 +273,55 @@ class DeepIPOAnalyzer:
                 cyclical_nature=True,
                 entry_barriers="MEDIUM"
             )
-        
+
+        # Consumer Goods & Retail (brand dependent)
+        elif any(word in name_lower for word in [
+            'consumer', 'retail', 'fashion', 'food', 'beverage', 'fmcg',
+            'apparel', 'textile', 'cosmetics', 'personal care', 'household'
+        ]):
+            return IndustryAnalysis(
+                sector="Consumer Goods",
+                industry_growth_rate=9.0,
+                market_size=80000.0,
+                competition_level="HIGH",
+                regulatory_risk="MEDIUM",
+                cyclical_nature=False,
+                entry_barriers="MEDIUM"
+            )
+
+        # Energy & Power (commodity dependent)
+        elif any(word in name_lower for word in [
+            'power', 'energy', 'electric', 'utility', 'renewable', 'solar',
+            'wind', 'thermal', 'hydro', 'nuclear', 'transmission', 'distribution'
+        ]):
+            return IndustryAnalysis(
+                sector="Energy & Power",
+                industry_growth_rate=6.0,
+                market_size=150000.0,
+                competition_level="MEDIUM",
+                regulatory_risk="HIGH",
+                cyclical_nature=True,
+                entry_barriers="HIGH"
+            )
+
+        # Mining & Metals (commodity dependent)
+        elif any(word in name_lower for word in [
+            'mining', 'coal', 'mineral', 'extraction', 'metals', 'ore'
+        ]):
+            return IndustryAnalysis(
+                sector="Mining & Metals",
+                industry_growth_rate=4.0,
+                market_size=60000.0,
+                competition_level="MEDIUM",
+                regulatory_risk="HIGH",
+                cyclical_nature=True,
+                entry_barriers="HIGH"
+            )
+
         # Default/Other
         else:
             return IndustryAnalysis(
-                sector="Other",
+                sector="Other Services",
                 industry_growth_rate=7.0,
                 market_size=50000.0,
                 competition_level="MEDIUM",
@@ -510,39 +577,61 @@ class DeepIPOAnalyzer:
         return details
     
     def _estimate_financials_from_public_sources(self, company_name: str) -> CompanyFinancials:
-        """Estimate financials from public sources and company name analysis."""
+        """Estimate financials from public sources and company name analysis with enhanced logic."""
         financials = CompanyFinancials()
-        
+
         try:
-            # Analyze company name for size indicators
+            # Analyze company name for size indicators with more sophisticated patterns
             name_lower = company_name.lower()
-            
+
             # Large established companies (likely to have strong financials)
-            if any(indicator in name_lower for indicator in ['hdfc', 'icici', 'sbi', 'tcs', 'infosys', 'wipro', 'reliance']):
+            large_indicators = [
+                'hdfc', 'icici', 'sbi', 'tcs', 'infosys', 'wipro', 'reliance',
+                'bajaj', 'mahindra', 'tata', 'maruti', 'bharti', 'adani',
+                'larsen', 'toubro', 'ntpc', 'power grid', 'coal india',
+                'hindustan unilever', 'itc', 'ongc', 'gail'
+            ]
+
+            if any(indicator in name_lower for indicator in large_indicators):
                 financials.revenue = 50000.0  # Crores
                 financials.profit = 8000.0    # Crores
                 financials.debt_to_equity = 0.3
                 financials.roe = 18.0
                 financials.profit_margin = 16.0
                 financials.revenue_growth = 10.0
-            
-            # Mid-size companies
-            elif any(indicator in name_lower for indicator in ['ltd', 'limited', 'corporation', 'corp']):
+                financials.market_cap = 100000.0  # Crores
+
+            # Mid-size established companies
+            elif any(indicator in name_lower for indicator in [
+                'technologies limited', 'systems limited', 'solutions limited',
+                'industries limited', 'international limited', 'global limited',
+                'corporation limited', 'enterprises limited', 'projects limited'
+            ]):
                 # Look for sector-specific indicators
-                if 'tech' in name_lower or 'software' in name_lower:
+                if 'tech' in name_lower or 'software' in name_lower or 'digital' in name_lower:
                     financials.revenue = 5000.0
                     financials.profit = 800.0
                     financials.debt_to_equity = 0.2
                     financials.roe = 20.0
                     financials.profit_margin = 16.0
                     financials.revenue_growth = 15.0
-                elif 'healthcare' in name_lower or 'pharma' in name_lower:
+                    financials.market_cap = 15000.0
+                elif 'healthcare' in name_lower or 'pharma' in name_lower or 'medical' in name_lower:
                     financials.revenue = 3000.0
                     financials.profit = 450.0
                     financials.debt_to_equity = 0.4
                     financials.roe = 15.0
                     financials.profit_margin = 15.0
                     financials.revenue_growth = 12.0
+                    financials.market_cap = 10000.0
+                elif 'finance' in name_lower or 'financial' in name_lower:
+                    financials.revenue = 2000.0
+                    financials.profit = 300.0
+                    financials.debt_to_equity = 0.6
+                    financials.roe = 12.0
+                    financials.profit_margin = 15.0
+                    financials.revenue_growth = 8.0
+                    financials.market_cap = 8000.0
                 else:
                     # Generic mid-size company
                     financials.revenue = 2000.0
@@ -551,19 +640,58 @@ class DeepIPOAnalyzer:
                     financials.roe = 12.0
                     financials.profit_margin = 10.0
                     financials.revenue_growth = 8.0
-            
-            # SME companies (higher risk, smaller scale)
-            elif any(indicator in name_lower for indicator in ['sme', 'small', 'micro']):
+                    financials.market_cap = 5000.0
+
+            # SME companies (higher risk, smaller scale) - enhanced detection
+            elif any(indicator in name_lower for indicator in [
+                'sme', 'small', 'micro', 'emerge', 'limited liability partnership',
+                'llp', 'private limited', 'pvt ltd', 'projects', 'engineering projects',
+                'oval', 'enterprises', 'services', 'ventures', 'associates',
+                'consultants', 'developers', 'builders', 'contractors'
+            ]):
                 financials.revenue = 500.0
                 financials.profit = 30.0
                 financials.debt_to_equity = 0.8
                 financials.roe = 10.0
                 financials.profit_margin = 6.0
                 financials.revenue_growth = 12.0
-                
+                financials.market_cap = 500.0
+
+            # Additional sector-specific analysis
+            else:
+                # Try to infer from company name patterns
+                if any(word in name_lower for word in ['bank', 'banking', 'nbfc', 'finance']):
+                    financials.revenue = 1500.0
+                    financials.profit = 200.0
+                    financials.debt_to_equity = 0.5
+                    financials.roe = 14.0
+                    financials.profit_margin = 13.0
+                    financials.revenue_growth = 10.0
+                elif any(word in name_lower for word in ['insurance', 'life insurance']):
+                    financials.revenue = 3000.0
+                    financials.profit = 400.0
+                    financials.debt_to_equity = 0.3
+                    financials.roe = 12.0
+                    financials.profit_margin = 13.0
+                    financials.revenue_growth = 8.0
+                elif any(word in name_lower for word in ['power', 'energy', 'utility']):
+                    financials.revenue = 8000.0
+                    financials.profit = 800.0
+                    financials.debt_to_equity = 1.2
+                    financials.roe = 10.0
+                    financials.profit_margin = 10.0
+                    financials.revenue_growth = 6.0
+                elif any(word in name_lower for word in ['steel', 'metal', 'mining']):
+                    financials.revenue = 6000.0
+                    financials.profit = 400.0
+                    financials.debt_to_equity = 1.0
+                    financials.roe = 8.0
+                    financials.profit_margin = 7.0
+                    financials.revenue_growth = 5.0
+
         except Exception as e:
             logger.warning(f"Error estimating financials: {e}")
-        
+
         return financials
     
     def _get_industry_average_pe(self, sector: str) -> float:

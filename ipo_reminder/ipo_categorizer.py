@@ -1,11 +1,13 @@
 """
-IPO categorization module for Main Board vs SME classification.
+IPO categorization module for Main Board vs SME classification with enhanced analysis.
 """
 
 import logging
 import re
 from typing import List, Tuple, Dict
 from dataclasses import dataclass
+
+from .utils import sanitize_input, validate_price_band, calculate_risk_score, generate_investment_thesis
 
 logger = logging.getLogger(__name__)
 
@@ -44,7 +46,12 @@ class IPOCategorizer:
     
     def categorize_ipo(self, company_name: str, price_band: str = None, 
                       lot_size: int = None) -> IPOCategory:
-        """Categorize IPO as Main Board or SME."""
+        """Categorize IPO as Main Board or SME with enhanced analysis."""
+        
+        # Sanitize inputs
+        company_name = sanitize_input(company_name)
+        if price_band:
+            price_band = sanitize_input(price_band)
         
         name_lower = company_name.lower()
         
@@ -58,7 +65,7 @@ class IPOCategorizer:
                 retail_friendly=True
             )
         
-        # Check for explicit SME indicators
+        # Check for explicit SME indicators with enhanced detection
         if any(sme_indicator in name_lower for sme_indicator in self.sme_indicators):
             return IPOCategory(
                 category="SME",
@@ -68,12 +75,12 @@ class IPOCategorizer:
                 retail_friendly=False  # Higher risk for retail
             )
         
-        # Price-based classification (more aggressive SME detection)
+        # Price-based classification with validation
         if price_band:
-            avg_price = self._extract_average_price(price_band)
-            if avg_price:
+            price_info = validate_price_band(price_band)
+            if price_info:
                 # Low price strongly indicates SME
-                if avg_price < 100:
+                if price_info['avg'] < 100:
                     return IPOCategory(
                         category="SME",
                         exchange="BSE_SME/NSE_EMERGE", 
@@ -82,7 +89,7 @@ class IPOCategorizer:
                         retail_friendly=False
                     )
                 # Very high price indicates Main Board
-                elif avg_price > 500:
+                elif price_info['avg'] > 500:
                     return IPOCategory(
                         category="MAIN_BOARD",
                         exchange="NSE/BSE",
@@ -91,7 +98,7 @@ class IPOCategorizer:
                         retail_friendly=True
                     )
         
-        # Business name analysis (stricter criteria for Main Board)
+        # Business name analysis with enhanced patterns
         if any(indicator in name_lower for indicator in self.main_board_indicators):
             return IPOCategory(
                 category="MAIN_BOARD",
@@ -99,6 +106,17 @@ class IPOCategorizer:
                 min_application_size=self._estimate_min_investment(price_band, lot_size),
                 lot_size=lot_size,
                 retail_friendly=True
+            )
+        
+        # Risk-based classification as final fallback
+        risk_analysis = calculate_risk_score(company_name, price_band or "")
+        if risk_analysis['level'] == 'HIGH':
+            return IPOCategory(
+                category="SME",
+                exchange="BSE_SME/NSE_EMERGE",
+                min_application_size=self._estimate_min_investment(price_band, lot_size),
+                lot_size=lot_size,
+                retail_friendly=False
             )
         
         # Default to SME if uncertain (safer for retail investors to be cautious)
@@ -167,8 +185,9 @@ def format_personal_guide_email(now_date, ipos: List) -> Tuple[str, str, str]:
 
 
 def format_ipo_email_html(today_date, ipos: List) -> Tuple[str, str, str]:
-    """Formats a professional HTML email with IPO recommendations."""
+    """Formats a professional HTML email with enhanced IPO recommendations."""
     from .deep_analyzer import DeepIPOAnalyzer
+    from .utils import create_email_summary, generate_investment_thesis
 
     formatted_date = today_date.strftime("%d %b %Y")
     subject = f"IPO Investment Guide • {formatted_date}"
@@ -181,55 +200,72 @@ def format_ipo_email_html(today_date, ipos: List) -> Tuple[str, str, str]:
         """
         return subject, text_body, html_body
 
+    # Create summary for enhanced analysis
+    summary = create_email_summary(ipos, today_date)
     analyzer = DeepIPOAnalyzer()
     
-    # --- Text Body Generation ---
+    # --- Enhanced Text Body Generation ---
     text_lines = [f"Your Personal IPO Investment Guide - {formatted_date}\n"]
+    text_lines.append(f"📊 Market Summary: {summary['total_ipos']} IPOs ({summary['main_board']} Main Board, {summary['sme']} SME)\n")
+
     for i, ipo in enumerate(ipos, 1):
-        company_name = getattr(ipo, 'name', 'Unknown Company')
-        price_band = getattr(ipo, 'price_band', None) or getattr(ipo, 'price_range', 'Price TBA')
+        company_name = sanitize_input(getattr(ipo, 'name', 'Unknown Company'))
+        price_band = sanitize_input(getattr(ipo, 'price_band', None) or getattr(ipo, 'price_range', 'Price TBA'))
+        
+        # Use enhanced analysis
         analysis = analyzer.analyze_ipo_comprehensive(company_name, price_band)
+        thesis = generate_investment_thesis(company_name, price_band)
+        risk_analysis = calculate_risk_score(company_name, price_band)
 
         action_map = {
-            "STRONG_BUY": "✅ APPLY", "BUY": "✅ APPLY",
-            "AVOID": "❌ AVOID", "STRONG_AVOID": "❌ AVOID"
+            "STRONG_BUY": "✅ STRONG BUY", "BUY": "✅ BUY",
+            "AVOID": "❌ AVOID", "STRONG_AVOID": "❌ STRONG AVOID"
         }
-        action = action_map.get(analysis.recommendation, "❌ AVOID")
+        action = action_map.get(analysis.recommendation, "⚠️ REVIEW")
         
         confidence_text = f"{analysis.confidence_score}% confidence"
-        insight = analysis.key_strengths[0] if analysis.key_strengths else (analysis.key_risks[0] if analysis.key_risks else "No specific insight.")
-
+        risk_text = f"Risk: {risk_analysis['level']} ({risk_analysis['score']}/100)"
+        
         text_lines.extend([
             f"{i}. {company_name}",
             f"   Price: {price_band}",
-            f"   My Recommendation: {action} ({confidence_text})",
-            f"   Key Insight: {insight}\n"
+            f"   Recommendation: {action} ({confidence_text})",
+            f"   Risk Assessment: {risk_text}",
+            f"   Key Insight: {analysis.key_strengths[0] if analysis.key_strengths else 'Analysis in progress'}",
+            ""
         ])
-    text_lines.append("---\nYour personal investment guide - based on deep fundamental analysis.")
+    
+    text_lines.append("---\nYour personal investment guide - based on comprehensive fundamental analysis.")
     text_body = "\n".join(text_lines)
 
-    # --- HTML Body Generation ---
+    # --- Enhanced HTML Body Generation ---
     html_parts = [f"""
     <div style="font-family: Arial, sans-serif; color: #333; max-width: 600px; margin: auto; border: 1px solid #ddd; border-radius: 8px; overflow: hidden;">
         <div style="background-color: #4CAF50; color: white; padding: 20px; text-align: center;">
             <h1 style="margin: 0;">IPO Investment Guide</h1>
             <p style="margin: 0;">{formatted_date}</p>
+            <p style="margin: 5px 0; font-size: 14px;">{summary['total_ipos']} IPOs • {summary['main_board']} Main Board • {summary['sme']} SME</p>
         </div>
         <div style="padding: 20px;">
     """]
 
     for ipo in ipos:
-        company_name = getattr(ipo, 'name', 'Unknown Company')
-        price_band = getattr(ipo, 'price_band', None) or getattr(ipo, 'price_range', 'Price TBA')
+        company_name = sanitize_input(getattr(ipo, 'name', 'Unknown Company'))
+        price_band = sanitize_input(getattr(ipo, 'price_band', None) or getattr(ipo, 'price_range', 'Price TBA'))
+        
         analysis = analyzer.analyze_ipo_comprehensive(company_name, price_band)
+        thesis = generate_investment_thesis(company_name, price_band)
+        risk_analysis = calculate_risk_score(company_name, price_band)
 
         rec_map = {
-            "STRONG_BUY": ("#28a745", "APPLY"), "BUY": ("#28a745", "APPLY"),
-            "AVOID": ("#dc3545", "AVOID"), "STRONG_AVOID": ("#dc3545", "AVOID")
+            "STRONG_BUY": ("#28a745", "STRONG BUY"), "BUY": ("#28a745", "BUY"),
+            "AVOID": ("#dc3545", "AVOID"), "STRONG_AVOID": ("#dc3545", "STRONG AVOID")
         }
-        rec_color, rec_text = rec_map.get(analysis.recommendation, ("#dc3545", "AVOID"))
+        rec_color, rec_text = rec_map.get(analysis.recommendation, ("#ffc107", "REVIEW"))
         
-        insight = analysis.key_strengths[0] if analysis.key_strengths else (analysis.key_risks[0] if analysis.key_risks else "Not available.")
+        risk_color = "#dc3545" if risk_analysis['level'] == 'HIGH' else "#ffc107" if risk_analysis['level'] == 'MEDIUM' else "#28a745"
+        
+        insight = analysis.key_strengths[0] if analysis.key_strengths else "Analysis in progress"
 
         html_parts.append(f"""
         <div style="margin-bottom: 20px; padding: 15px; border-left: 5px solid {rec_color}; background-color: #f9f9f9; border-radius: 5px;">
@@ -237,6 +273,7 @@ def format_ipo_email_html(today_date, ipos: List) -> Tuple[str, str, str]:
             <p style="margin: 5px 0;"><strong>Price:</strong> {price_band}</p>
             <p style="margin: 5px 0;"><strong>Recommendation:</strong> <span style="color: {rec_color}; font-weight: bold;">{rec_text}</span></p>
             <p style="margin: 5px 0;"><strong>Confidence:</strong> {analysis.confidence_score}%</p>
+            <p style="margin: 5px 0;"><strong>Risk Level:</strong> <span style="color: {risk_color};">{risk_analysis['level']} ({risk_analysis['score']}/100)</span></p>
             <p style="margin: 5px 0;"><strong>Key Insight:</strong> {insight}</p>
         </div>
         """)
@@ -244,7 +281,8 @@ def format_ipo_email_html(today_date, ipos: List) -> Tuple[str, str, str]:
     html_parts.append("""
         </div>
         <div style="background-color: #f2f2f2; color: #666; padding: 15px; text-align: center; font-size: 12px;">
-            <p style="margin: 0;">This guide is based on automated fundamental analysis. Always do your own research.</p>
+            <p style="margin: 0;">This guide is based on automated fundamental analysis. Always do your own research before investing.</p>
+            <p style="margin: 5px 0;"><strong>Disclaimer:</strong> Past performance is not indicative of future results. IPO investments carry risk.</p>
         </div>
     </div>
     """)

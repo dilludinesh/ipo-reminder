@@ -9,6 +9,40 @@ Daily **9:00 AM IST** cloud job that emails you IPOs **closing today** with a cl
 
 ---
 
+## 🚀 **Enhanced Features (v2.0)**
+
+### Security & Validation
+- ✅ **Input Sanitization**: All scraped data is sanitized to prevent XSS attacks
+- ✅ **Email Validation**: Robust email address validation and format checking
+- ✅ **HTML Escaping**: Safe HTML content generation
+- ✅ **Request Validation**: Enhanced error handling for network requests
+
+### Advanced Analysis
+- 🧠 **Enhanced Deep Analyzer**: More sophisticated financial analysis with sector-specific metrics
+- 📊 **Risk Assessment**: Comprehensive risk scoring with multiple factors
+- 🎯 **Investment Thesis**: Automated investment thesis generation
+- 📈 **Price Validation**: Robust price band parsing and validation
+
+### Improved Email System
+- 📧 **Rich HTML Emails**: Professional email templates with enhanced formatting
+- 📱 **Mobile Responsive**: Emails optimized for mobile viewing
+- 🔒 **Secure Sending**: Enhanced SMTP security with proper authentication
+- 📝 **Detailed Analysis**: Comprehensive IPO analysis in email content
+
+### Better Data Processing
+- 🛡️ **Utility Functions**: Centralized utility functions for common operations
+- 📊 **Market Summary**: Automated market summary generation
+- 🎯 **Smart Categorization**: Enhanced IPO categorization with risk-based analysis
+- 🔄 **Fallback Systems**: Improved fallback mechanisms for data sources
+
+### Development Tools
+- 🧪 **Enhanced Testing**: Comprehensive test suite with utilities
+- 📏 **Code Formatting**: Black and isort configuration for consistent code style
+- 📊 **Coverage Reports**: Detailed test coverage reporting
+- 🔧 **Development Dependencies**: Added tools for better development experience
+
+---
+
 ## Quick Start
 
 ### Cloud Setup (GitHub Actions)

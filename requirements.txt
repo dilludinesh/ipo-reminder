@@ -3,3 +3,27 @@ requests>=2.32.0
 beautifulsoup4>=4.9.3
 pytz>=2021.1
 python-dateutil>=2.9.0.post0
+pandas>=2.2.2
+python-dotenv>=0.19.0
+
+# Email and validation
+secure-smtplib>=0.1.1
+email-validator>=2.1.0
+
+# Microsoft integration
+msal>=1.33.0
+exchangelib>=5.5.1
+
+# Data processing and utilities
+numpy>=1.24.0
+scipy>=1.10.0
+scikit-learn>=1.3.0
+
+# Logging and monitoring
+structlog>=23.1.0
+
+# Development and testing
+pytest>=7.4.0
+pytest-cov>=4.1.0
+black>=23.0.0
+flake8>=6.0.0

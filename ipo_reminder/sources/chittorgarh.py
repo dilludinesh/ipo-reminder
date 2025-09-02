@@ -105,17 +105,16 @@ class IPOInfo:
         return self.close_date == today if self.close_date else False
 
 def _clean_text(text: str) -> str:
-    """Clean and normalize text by removing extra whitespace.
-    
-    Args:
-        text: Input text to clean
-        
-    Returns:
-        Cleaned text with normalized whitespace
-    """
+    """Clean and normalize text by removing extra whitespace and dangerous characters."""
     if not text:
         return ""
-    return re.sub(r"\s+", " ", str(text)).strip()
+    # Remove potentially dangerous HTML/script content
+    text = re.sub(r'<[^>]+>', '', str(text))  # Remove HTML tags
+    text = re.sub(r'[<>]', '', text)  # Remove angle brackets
+    text = re.sub(r'javascript:', '', text, flags=re.IGNORECASE)  # Remove JS
+    text = re.sub(r'on\w+\s*=', '', text, flags=re.IGNORECASE)  # Remove event handlers
+    # Normalize whitespace
+    return re.sub(r"\s+", " ", text).strip()
 
 def _parse_date(date_str: str) -> Optional[date]:
     """Parse date string into a date object.
