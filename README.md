@@ -126,7 +126,7 @@
 
 ```bash
 # Clone the repository
-git clone https://github.com/your-username/ipo-reminder.git
+git clone https://github.com/dilludinesh/ipo-reminder.git
 cd ipo-reminder
 
 # Create virtual environment
@@ -137,60 +137,89 @@ source venv/bin/activate  # On Windows: venv\Scripts\activate
 pip install -r requirements.txt
 ```
 
-### 2. Database Setup
+### 2. GitHub Automation Setup (Recommended)
+
+For **completely automated IPO reminders**, set up GitHub Actions:
+
+#### Configure GitHub Secrets
+1. Go to your GitHub repository: https://github.com/dilludinesh/ipo-reminder
+2. Click **Settings** → **Secrets and variables** → **Actions**
+3. Add these secrets:
+
+| Secret Name | Description | Example |
+|-------------|-------------|---------|
+| `SENDER_EMAIL` | Your Gmail address | `your-email@gmail.com` |
+| `SENDER_PASSWORD` | Gmail App Password | `abcd-efgh-ijkl-mnop` |
+| `RECIPIENT_EMAIL` | Email to receive reminders | `recipient@email.com` |
+| `BSE_API_KEY` | BSE API key (optional) | `your-bse-key` |
+| `NSE_API_KEY` | NSE API key (optional) | `your-nse-key` |
+
+#### Gmail App Password Setup
+1. Enable 2-Factor Authentication on Gmail
+2. Go to https://myaccount.google.com/apppasswords
+3. Generate an App Password for "IPO Reminder"
+4. Use this 16-character password as `SENDER_PASSWORD`
+
+#### Automated Schedule
+The system runs automatically:
+- **Daily at 9:00 AM IST** (3:30 AM UTC)
+- **Manual trigger** available in GitHub Actions
+- **On every push** to main branch (for testing)
+
+### 3. Local Testing (Optional)
 
 ```bash
-# Set up PostgreSQL database
-createdb ipo_reminder
-
-# Run database setup script
+# Set up local database
 python setup_database.py setup
 
-# Verify setup
-python setup_database.py verify
-```
+# Create .env file
+cp .env.example .env
+# Edit .env with your email credentials
 
-### 3. Configuration
-
-Create a `.env` file in the project root:
-
-```bash
-# Email Configuration
-SENDER_EMAIL=your-email@gmail.com
-SENDER_PASSWORD=your-app-password
-RECIPIENT_EMAIL=recipient@email.com
-
-# Database Configuration
-DATABASE_URL=postgresql://user:password@localhost:5432/ipo_reminder
-
-# Redis Configuration
-REDIS_URL=redis://localhost:6379/0
-
-# API Keys (Optional)
-BSE_API_KEY=your-bse-api-key
-NSE_API_KEY=your-nse-api-key
-
-# Security
-ENCRYPTION_KEY=your-32-character-encryption-key
-JWT_SECRET_KEY=your-jwt-secret-key
-
-# Enterprise Features
-ENTERPRISE_MODE=true
-MONITORING_ENABLED=true
-AUDIT_ENABLED=true
-```
-
-### 4. Run the System
-
-```bash
-# Start enterprise orchestrator
-python -m ipo_reminder.enterprise_orchestrator
-
-# Or run a single cycle for testing
-python -c "from ipo_reminder.enterprise_orchestrator import enterprise_orchestrator; import asyncio; asyncio.run(enterprise_orchestrator.run_enterprise_cycle())"
+# Run locally
+python -m ipo_reminder
 ```
 
 ---
+
+## ⚙️ **GitHub Actions Automation**
+
+### Workflow Features
+- ✅ **Automated Daily Execution**: Runs at 9:00 AM IST every day
+- ✅ **PostgreSQL Database**: Enterprise-grade database setup
+- ✅ **Redis Caching**: High-performance caching layer
+- ✅ **Multi-source Data**: Fetches from Zerodha, Moneycontrol, Chittorgarh
+- ✅ **Professional Emails**: HTML templates with IPO analysis
+- ✅ **Comprehensive Logging**: All activities logged and stored
+- ✅ **Error Handling**: Robust error handling and notifications
+- ✅ **Artifact Upload**: Logs saved for 30 days
+
+### Workflow Triggers
+```yaml
+on:
+  schedule:
+    - cron: '30 3 * * *'  # 9:00 AM IST daily
+  workflow_dispatch:       # Manual trigger
+  push:
+    branches: [ main ]     # Test on push
+```
+
+### Monitoring Your Automation
+1. Go to **Actions** tab in your GitHub repository
+2. Click **Enterprise IPO Reminder** workflow
+3. View run history and detailed logs
+4. Download log artifacts if needed
+5. Check email delivery status
+
+### Troubleshooting Automation
+- **Check Secrets**: Ensure all required secrets are set
+- **Verify App Password**: Gmail App Password must be valid
+- **Review Logs**: Detailed error logs in workflow runs
+- **Test Manually**: Use workflow dispatch to test immediately
+
+---
+
+## 📊 **System Architecture**
 
 ## ⚙️ **Configuration Options**
 

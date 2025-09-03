@@ -5,10 +5,40 @@ on:
     # Run daily at 9:00 AM IST (3:30 AM UTC)
     - cron: '30 3 * * *'
   workflow_dispatch:  # Allow manual triggering
+  push:
+    branches: [ main ]
+    paths:
+      - 'ipo_reminder/**'
+      - '.github/workflows/ipo-reminder.yml'
 
 jobs:
   send-enterprise-ipo-reminders:
     runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_DB: ipo_reminder
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
 
     steps:
     - name: Checkout code
@@ -19,23 +49,28 @@ jobs:
       with:
         python-version: '3.11'
 
+    - name: Cache pip dependencies
+      uses: actions/cache@v3
+      with:
+        path: ~/.cache/pip
+        key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
+        restore-keys: |
+          ${{ runner.os }}-pip-
+
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
         pip install -r requirements.txt
 
-    - name: Setup PostgreSQL
-      uses: harmon758/postgresql-action@v1
-      with:
-        postgresql version: '15'
-        postgresql db: 'ipo_reminder'
-        postgresql user: 'postgres'
-        postgresql password: 'postgres'
+    - name: Create logs directory
+      run: mkdir -p logs
 
-    - name: Setup Redis
-      uses: supercharge/redis-github-action@1.7.0
-      with:
-        redis-version: 7
+    - name: Setup database
+      env:
+        DATABASE_URL: postgresql://postgres:postgres@localhost:5432/ipo_reminder
+      run: |
+        echo "📊 Setting up database..."
+        python setup_database.py setup
 
     - name: Run Enterprise IPO Reminder
       env:
@@ -51,6 +86,7 @@ jobs:
         ENTERPRISE_MODE: true
         MONITORING_ENABLED: true
         AUDIT_ENABLED: true
+        LOG_LEVEL: INFO
       run: |
         echo "🚀 ENTERPRISE IPO REMINDER WORKFLOW"
         echo "==================================="
@@ -66,14 +102,45 @@ jobs:
         echo "  Cache: Redis Ready"
         echo ""
 
-        # Initialize database
-        echo "📊 Setting up database..."
-        python setup_database.py setup
+        # Verify email configuration
+        if [ -z "$SENDER_EMAIL" ] || [ -z "$SENDER_PASSWORD" ] || [ -z "$RECIPIENT_EMAIL" ]; then
+          echo "❌ Email configuration missing!"
+          echo "Please set the following GitHub secrets:"
+          echo "  - SENDER_EMAIL: Your Gmail address"
+          echo "  - SENDER_PASSWORD: Your Gmail app password"
+          echo "  - RECIPIENT_EMAIL: Email address to receive IPO reminders"
+          exit 1
+        fi
+
+        echo "✅ Email configuration verified"
+        echo "📧 Sender: $SENDER_EMAIL"
+        echo "📧 Recipient: $RECIPIENT_EMAIL"
+        echo ""
 
         # Run enterprise orchestrator
         echo "🏢 Starting Enterprise IPO Orchestrator..."
-        python -m ipo_reminder.enterprise_orchestrator
+        cd /home/runner/work/ipo-reminder/ipo-reminder
+        python -m ipo_reminder
 
         echo ""
         echo "✅ Enterprise IPO Reminder workflow completed!"
         echo "📧 Email sent successfully (if IPOs found)"
+        echo "📊 System logs saved to logs/ directory"
+
+    - name: Upload logs
+      if: always()
+      uses: actions/upload-artifact@v3
+      with:
+        name: enterprise-ipo-logs-${{ github.run_number }}
+        path: logs/
+        retention-days: 30
+
+    - name: Notification on failure
+      if: failure()
+      run: |
+        echo "❌ Enterprise IPO Reminder workflow failed!"
+        echo "Please check the logs and GitHub Actions output for details."
+        echo "Common issues:"
+        echo "  - Missing email secrets in GitHub repository"
+        echo "  - Database connection issues"
+        echo "  - Network connectivity problems with IPO data sources"
