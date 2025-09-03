@@ -122,24 +122,24 @@
 
 ## 🚀 **Quick Start**
 
-### 1. Environment Setup
+### Option 1: GitHub Codespaces (Recommended - Fully Remote)
 
-```bash
-# Clone the repository
-git clone https://github.com/dilludinesh/ipo-reminder.git
-cd ipo-reminder
+For a **completely remote development and execution environment**, use GitHub Codespaces:
 
-# Create virtual environment
-python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
+1. **Open in Codespaces**: Go to https://github.com/dilludinesh/ipo-reminder and click "Code" → "Open with Codespaces"
+2. **Automatic Setup**: The environment sets up Python, PostgreSQL, Redis, and all dependencies
+3. **Start Developing**: Everything runs in the cloud with no local setup required
 
-# Install dependencies
-pip install -r requirements.txt
-```
+**Benefits:**
+- ✅ Zero local setup
+- ✅ Pre-configured development environment
+- ✅ All services (DB, cache) included
+- ✅ Automatic dependency installation
+- ✅ VS Code in the browser
 
-### 2. GitHub Automation Setup (Recommended)
+### Option 2: GitHub Actions Automation (Production)
 
-For **completely automated IPO reminders**, set up GitHub Actions:
+For **completely automated IPO reminders running remotely on GitHub**, set up GitHub Actions:
 
 #### Configure GitHub Secrets
 1. Go to your GitHub repository: https://github.com/dilludinesh/ipo-reminder
@@ -166,7 +166,9 @@ The system runs automatically:
 - **Manual trigger** available in GitHub Actions
 - **On every push** to main branch (for testing)
 
-### 3. Local Testing (Optional)
+### Option 3: Local Development (Optional)
+
+For local development and testing, you can run the system locally:
 
 ```bash
 # Set up local database
@@ -182,11 +184,12 @@ python -m ipo_reminder
 
 ---
 
-## ⚙️ **GitHub Actions Automation**
+## ⚙️ **GitHub Actions Automation (Remote Execution)**
 
 ### Workflow Features
+- ✅ **Fully Remote Execution**: Runs entirely on GitHub's cloud infrastructure
 - ✅ **Automated Daily Execution**: Runs at 9:00 AM IST every day
-- ✅ **PostgreSQL Database**: Enterprise-grade database setup
+- ✅ **PostgreSQL Database**: Enterprise-grade database setup in the cloud
 - ✅ **Redis Caching**: High-performance caching layer
 - ✅ **Multi-source Data**: Fetches from Zerodha, Moneycontrol, Chittorgarh
 - ✅ **Professional Emails**: HTML templates with IPO analysis
