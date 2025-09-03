@@ -1,36 +1,79 @@
-name: IPO Reminder
+name: Enterprise IPO Reminder
 
 on:
   schedule:
-    # Run daily at 6:00 AM IST (12:30 AM UTC)
-    - cron: '30 0 * * *'
+    # Run daily at 9:00 AM IST (3:30 AM UTC)
+    - cron: '30 3 * * *'
   workflow_dispatch:  # Allow manual triggering
 
 jobs:
-  send-ipo-reminders:
+  send-enterprise-ipo-reminders:
     runs-on: ubuntu-latest
-    
+
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
-      
+
     - name: Set up Python
       uses: actions/setup-python@v4
       with:
         python-version: '3.11'
-        
+
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
         pip install -r requirements.txt
-        
-    - name: Run IPO Reminder
+
+    - name: Setup PostgreSQL
+      uses: harmon758/postgresql-action@v1
+      with:
+        postgresql version: '15'
+        postgresql db: 'ipo_reminder'
+        postgresql user: 'postgres'
+        postgresql password: 'postgres'
+
+    - name: Setup Redis
+      uses: supercharge/redis-github-action@1.7.0
+      with:
+        redis-version: 7
+
+    - name: Run Enterprise IPO Reminder
       env:
         SENDER_EMAIL: ${{ secrets.SENDER_EMAIL }}
         SENDER_PASSWORD: ${{ secrets.SENDER_PASSWORD }}
         RECIPIENT_EMAIL: ${{ secrets.RECIPIENT_EMAIL }}
+        DATABASE_URL: postgresql://postgres:postgres@localhost:5432/ipo_reminder
+        REDIS_URL: redis://localhost:6379/0
+        BSE_API_KEY: ${{ secrets.BSE_API_KEY }}
+        NSE_API_KEY: ${{ secrets.NSE_API_KEY }}
+        ENCRYPTION_KEY: ${{ secrets.ENCRYPTION_KEY }}
+        JWT_SECRET_KEY: ${{ secrets.JWT_SECRET_KEY }}
+        ENTERPRISE_MODE: true
+        MONITORING_ENABLED: true
+        AUDIT_ENABLED: true
       run: |
-        echo "⏰ Workflow execution time:"
+        echo "🚀 ENTERPRISE IPO REMINDER WORKFLOW"
+        echo "==================================="
+        echo "⏰ Execution time:"
         echo "  UTC: $(date -u '+%Y-%m-%d %H:%M:%S %Z')"
         echo "  IST: $(TZ='Asia/Kolkata' date '+%Y-%m-%d %H:%M:%S %Z')"
-        python -m ipo_reminder.ipo_reminder
+        echo ""
+        echo "🔧 System Configuration:"
+        echo "  Enterprise Mode: $ENTERPRISE_MODE"
+        echo "  Monitoring: $MONITORING_ENABLED"
+        echo "  Audit Logging: $AUDIT_ENABLED"
+        echo "  Database: PostgreSQL Ready"
+        echo "  Cache: Redis Ready"
+        echo ""
+
+        # Initialize database
+        echo "📊 Setting up database..."
+        python setup_database.py setup
+
+        # Run enterprise orchestrator
+        echo "🏢 Starting Enterprise IPO Orchestrator..."
+        python -m ipo_reminder.enterprise_orchestrator
+
+        echo ""
+        echo "✅ Enterprise IPO Reminder workflow completed!"
+        echo "📧 Email sent successfully (if IPOs found)"
