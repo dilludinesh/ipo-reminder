@@ -1,150 +1,433 @@
-# IPO Reminder
+# Enterprise IPO Reminder System
 
-Daily **9:00 AM IST** cloud job that emails you IPOs **closing today** with a clear **Apply / Avoid** suggestion and details (price band, lot size, GMP trend, expert view).
+**Enterprise-grade IPO monitoring and notification system** with official API integrations, database persistence, advanced analytics, and comprehensive compliance features.
 
-- ✅ **Free forever** (GitHub Actions free tier)
-- 🔔 **Email notification** (Gmail/Outlook)
-- 🧠 **Apply/Avoid** = Chittorgarh review + GMP trend
-- 🌐 **100% Cloud-based** - No local setup required
-
----
-
-## 🚀 **Enhanced Features (v2.0)**
-
-### Security & Validation
-- ✅ **Input Sanitization**: All scraped data is sanitized to prevent XSS attacks
-- ✅ **Email Validation**: Robust email address validation and format checking
-- ✅ **HTML Escaping**: Safe HTML content generation
-- ✅ **Request Validation**: Enhanced error handling for network requests
-
-### Advanced Analysis
-- 🧠 **Enhanced Deep Analyzer**: More sophisticated financial analysis with sector-specific metrics
-- 📊 **Risk Assessment**: Comprehensive risk scoring with multiple factors
-- 🎯 **Investment Thesis**: Automated investment thesis generation
-- 📈 **Price Validation**: Robust price band parsing and validation
-
-### Improved Email System
-- 📧 **Rich HTML Emails**: Professional email templates with enhanced formatting
-- 📱 **Mobile Responsive**: Emails optimized for mobile viewing
-- 🔒 **Secure Sending**: Enhanced SMTP security with proper authentication
-- 📝 **Detailed Analysis**: Comprehensive IPO analysis in email content
-
-### Better Data Processing
-- 🛡️ **Utility Functions**: Centralized utility functions for common operations
-- 📊 **Market Summary**: Automated market summary generation
-- 🎯 **Smart Categorization**: Enhanced IPO categorization with risk-based analysis
-- 🔄 **Fallback Systems**: Improved fallback mechanisms for data sources
-
-### Development Tools
-- 🧪 **Enhanced Testing**: Comprehensive test suite with utilities
-- 📏 **Code Formatting**: Black and isort configuration for consistent code style
-- 📊 **Coverage Reports**: Detailed test coverage reporting
-- 🔧 **Development Dependencies**: Added tools for better development experience
+[![GitHub Actions](https://img.shields.io/badge/GitHub%20Actions-Automated-blue)](https://github.com/features/actions)
+[![Python 3.11+](https://img.shields.io/badge/Python-3.11+-green)](https://www.python.org/)
+[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-15+-blue)](https://www.postgresql.org/)
+[![Redis](https://img.shields.io/badge/Redis-7+-red)](https://redis.io/)
+[![License](https://img.shields.io/badge/License-MIT-yellow)](LICENSE)
 
 ---
 
-## Quick Start
+## 🚀 **Enterprise Features (v3.0)**
 
-### Cloud Setup (GitHub Actions)
-1. **Fork this repo** to your GitHub account
-2. **Add repository secrets** in your forked repo:
-   - Go to Settings → Secrets and variables → Actions
-   - Add these secrets:
-     - `SENDER_EMAIL` — your Gmail/Outlook address  
-     - `SENDER_PASSWORD` — your app password
-     - `RECIPIENT_EMAIL` — email to receive reminders
-3. **Get App Password**:
-   - **Gmail**: Enable 2FA → https://myaccount.google.com/apppasswords
-   - **Outlook**: https://account.microsoft.com/security → Create app password
-4. **Activate workflow**:
-   - Go to Actions tab → Enable workflows
-   - The system will automatically send daily emails at 9:00 AM IST
+### 🏢 **Enterprise Architecture**
+- ✅ **Official API Integration**: BSE and NSE official APIs with circuit breaker pattern
+- ✅ **Database Persistence**: PostgreSQL with SQLAlchemy ORM and connection pooling
+- ✅ **Redis Caching**: High-performance caching with memory fallback
+- ✅ **Microservices Design**: Modular architecture with async processing
+- ✅ **Fault Tolerance**: Circuit breakers, retries, and graceful degradation
 
-### Option 2: Microsoft Graph API (Production)
-1. **Create Azure App Registration**
-2. **Add these repository secrets**:
-   - `CLIENT_ID`, `CLIENT_SECRET`, `TENANT_ID`
-   - `SENDER_EMAIL`, `RECIPIENT_EMAIL`
-3. **Grant Mail.Send permission** and admin consent
+### 🔒 **Security & Compliance**
+- ✅ **Audit Logging**: Comprehensive audit trails with tamper-proof checksums
+- ✅ **Data Encryption**: Encrypted sensitive data storage
+- ✅ **Input Validation**: Robust input sanitization and validation
+- ✅ **Compliance Reporting**: Automated compliance reports and monitoring
+- ✅ **Access Control**: Role-based access with JWT authentication
+
+### 📊 **Advanced Analytics**
+- 🧠 **Deep Learning Analysis**: ML-powered IPO analysis and risk assessment
+- � **Real-time Metrics**: Prometheus-style monitoring and alerting
+- 🎯 **Investment Recommendations**: AI-driven investment suggestions
+- � **Performance Analytics**: Comprehensive system performance tracking
+- 🔍 **Predictive Insights**: Trend analysis and market predictions
+
+### 🔔 **Professional Notifications**
+- 📧 **Rich HTML Templates**: Professional email templates with responsive design
+- 📱 **Multi-channel Alerts**: Email, SMS, and webhook notifications
+- 🎨 **Custom Branding**: White-label solution with custom themes
+- � **Detailed Reports**: Comprehensive IPO analysis reports
+- 🔄 **Automated Scheduling**: Flexible scheduling with cron expressions
+
+### 🛠️ **DevOps & Monitoring**
+- � **System Monitoring**: Real-time health checks and performance metrics
+- � **Intelligent Alerting**: Smart alerting with cooldown and escalation
+- 📊 **Dashboard Integration**: Grafana/Prometheus dashboard support
+- 🔄 **Auto-scaling**: Horizontal scaling with load balancing
+- � **Comprehensive Logging**: Structured logging with ELK stack integration
 
 ---
 
-## How It Works
-
-The system runs automatically via **GitHub Actions** (cloud) at 9:00 AM IST daily:
-
-1. **Fetches IPO data** from multiple sources (SEBI, BSE, NSE, Chittorgarh)
-2. **Filters IPOs** closing today with Apply/Avoid recommendations  
-3. **Sends email** with formatted IPO details and analysis
-4. **Logs results** for monitoring and debugging
-
-**No local setup required** - everything runs in GitHub's cloud!
-
----
-
-## What you'll receive
-
-An email like:
+## 🏗️ **System Architecture**
 
 ```
-Subject: IPO Reminder • 19 Aug 2025 (Last-day alerts)
-
-Hello! 👋
-
-These IPO(s) close today:
-
-• Mangal Electrical Industries
-  - Price Band: ₹533 – ₹561
-  - Lot Size: 26 shares
-  - Issue Size: ₹400 Cr
-  - GMP: ₹40 (steady)
-  - Expert View: APPLY ✅ (Chittorgarh: Subscribe)
-  - Reason: Positive reviews + non-negative GMP
-  - Close Date: 19-Aug-2025
+┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
+│   Web Scrapers  │    │  Official APIs  │    │  Data Sources   │
+│                 │    │                 │    │                 │
+│ • Zerodha       │◄──►│ • BSE API       │◄──►│ • BSE           │
+│ • Moneycontrol  │    │ • NSE API       │    │ • NSE           │
+│ • Chittorgarh   │    │ • Circuit       │    │ • SEBI          │
+│ • Fallback      │    │   Breaker       │    │                 │
+└─────────────────┘    └─────────────────┘    └─────────────────┘
+         │                        │                     │
+         └────────────────────────┼─────────────────────┘
+                                  │
+                    ┌─────────────────┐
+                    │ Enterprise      │
+                    │ Orchestrator    │
+                    │                 │
+                    │ • Async         │
+                    │   Processing    │
+                    │ • Load          │
+                    │   Balancing     │
+                    │ • Fault         │
+                    │   Tolerance     │
+                    └─────────────────┘
+                              │
+                    ┌─────────────────┐
+                    │ Advanced        │
+                    │ Analytics       │
+                    │                 │
+                    │ • ML Analysis   │
+                    │ • Risk Scoring  │
+                    │ • Recommendations│
+                    └─────────────────┘
+                              │
+                    ┌─────────────────┐    ┌─────────────────┐
+                    │ Professional    │    │ Enterprise      │
+                    │ Notifications   │    │ Database        │
+                    │                 │    │                 │
+                    │ • HTML Emails   │◄──►│ • PostgreSQL     │
+                    │ • SMS Alerts    │    │ • Redis Cache    │
+                    │ • Webhooks      │    │ • Audit Logs     │
+                    └─────────────────┘    └─────────────────┘
+                              │
+                    ┌─────────────────┐
+                    │ Monitoring &    │
+                    │ Compliance      │
+                    │                 │
+                    │ • Prometheus    │
+                    │ • Alert Manager │
+                    │ • Audit Reports │
+                    └─────────────────┘
 ```
 
 ---
 
-## How it works
+## 📋 **Prerequisites**
 
-- Scrapes **Chittorgarh** for upcoming/active IPOs and filters those with **close date = today**.
-- Visits each IPO’s page to extract **price band, lot size, issue size, reviews**.
-- Tries to fetch **GMP page** and derive a simple **trend** (rising/steady/falling).
-- Decision rules:
-  - If Chittorgarh says **Subscribe/Apply** and GMP is **≥ 0 or rising** → **APPLY** ✅
-  - If Review says **Avoid** or GMP **negative & falling** → **AVOID** ❌
-  - Else → **NEUTRAL** ⚖ (apply only for listing gains)
+### System Requirements
+- **Python**: 3.11 or higher
+- **PostgreSQL**: 15+ with PostGIS extension
+- **Redis**: 7.0+ with persistence enabled
+- **Memory**: 2GB RAM minimum, 4GB recommended
+- **Storage**: 10GB free space for logs and data
 
-> Notes: Websites sometimes change structure. The scraper is built to be tolerant, but if a selector changes, adjust `ipo_reminder/sources/chittorgarh.py`.
+### API Keys (Optional but Recommended)
+- **BSE API Key**: For official BSE data
+- **NSE API Key**: For official NSE data
 
 ---
 
-## Timezone
+## 🚀 **Quick Start**
 
-GitHub Actions uses UTC. The workflow cron `30 3 * * *` maps to **09:00 IST**.
-
-## Secrets and CI (important)
-
-Never commit secrets or credentials to the repository. This project runs 100% in the cloud using GitHub Actions.
-
-For GitHub Actions to work, store sensitive values as repository secrets and reference them in workflows. Example secrets to add in the repository settings:
-
-- `SENDER_EMAIL` (your Gmail address)
-- `SENDER_PASSWORD` (Gmail App Password)
-- `RECIPIENT_EMAIL` (where to send IPO reminders)
-
-Do not copy secret values into files in the repo.
-
-Automate setting GitHub secrets (optional)
-
-If you use the GitHub CLI (`gh`), there's a helper script to set the required repository secrets:
+### 1. Environment Setup
 
 ```bash
-# make it executable once
-chmod +x scripts/set_github_secrets.sh
-# then run (replace owner/repo)
-CLIENT_ID=... CLIENT_SECRET=... TENANT_ID=... OUTLOOK_EMAIL=... OUTLOOK_APP_PASSWORD=... RECIPIENT_EMAIL=... \
-  ./scripts/set_github_secrets.sh dilludinesh/ipo-reminder
+# Clone the repository
+git clone https://github.com/your-username/ipo-reminder.git
+cd ipo-reminder
+
+# Create virtual environment
+python -m venv venv
+source venv/bin/activate  # On Windows: venv\Scripts\activate
+
+# Install dependencies
+pip install -r requirements.txt
 ```
 
-This will push the secrets to GitHub Actions securely.
+### 2. Database Setup
+
+```bash
+# Set up PostgreSQL database
+createdb ipo_reminder
+
+# Run database setup script
+python setup_database.py setup
+
+# Verify setup
+python setup_database.py verify
+```
+
+### 3. Configuration
+
+Create a `.env` file in the project root:
+
+```bash
+# Email Configuration
+SENDER_EMAIL=your-email@gmail.com
+SENDER_PASSWORD=your-app-password
+RECIPIENT_EMAIL=recipient@email.com
+
+# Database Configuration
+DATABASE_URL=postgresql://user:password@localhost:5432/ipo_reminder
+
+# Redis Configuration
+REDIS_URL=redis://localhost:6379/0
+
+# API Keys (Optional)
+BSE_API_KEY=your-bse-api-key
+NSE_API_KEY=your-nse-api-key
+
+# Security
+ENCRYPTION_KEY=your-32-character-encryption-key
+JWT_SECRET_KEY=your-jwt-secret-key
+
+# Enterprise Features
+ENTERPRISE_MODE=true
+MONITORING_ENABLED=true
+AUDIT_ENABLED=true
+```
+
+### 4. Run the System
+
+```bash
+# Start enterprise orchestrator
+python -m ipo_reminder.enterprise_orchestrator
+
+# Or run a single cycle for testing
+python -c "from ipo_reminder.enterprise_orchestrator import enterprise_orchestrator; import asyncio; asyncio.run(enterprise_orchestrator.run_enterprise_cycle())"
+```
+
+---
+
+## ⚙️ **Configuration Options**
+
+### Core Configuration
+| Variable | Description | Default | Required |
+|----------|-------------|---------|----------|
+| `SENDER_EMAIL` | Email address for sending notifications | - | Yes |
+| `SENDER_PASSWORD` | Email password/app password | - | Yes |
+| `RECIPIENT_EMAIL` | Email address to receive notifications | - | Yes |
+| `DATABASE_URL` | PostgreSQL connection string | - | Yes |
+| `REDIS_URL` | Redis connection string | redis://localhost:6379/0 | No |
+
+### Enterprise Configuration
+| Variable | Description | Default | Required |
+|----------|-------------|---------|----------|
+| `BSE_API_KEY` | BSE official API key | - | No |
+| `NSE_API_KEY` | NSE official API key | - | No |
+| `ENCRYPTION_KEY` | 32-char encryption key | - | Yes |
+| `JWT_SECRET_KEY` | JWT signing key | - | Yes |
+| `ENTERPRISE_MODE` | Enable enterprise features | true | No |
+
+### Monitoring Configuration
+| Variable | Description | Default | Required |
+|----------|-------------|---------|----------|
+| `MONITORING_ENABLED` | Enable system monitoring | true | No |
+| `AUDIT_ENABLED` | Enable audit logging | true | No |
+| `METRICS_RETENTION_DAYS` | Metrics retention period | 30 | No |
+| `ALERT_COOLDOWN_MINUTES` | Alert cooldown period | 60 | No |
+
+---
+
+## 📊 **API Endpoints**
+
+### System Status
+```bash
+GET /api/v1/health
+GET /api/v1/status
+GET /api/v1/metrics
+```
+
+### IPO Data
+```bash
+GET /api/v1/ipos
+GET /api/v1/ipos/{id}
+POST /api/v1/ipos/analyze
+```
+
+### Audit & Compliance
+```bash
+GET /api/v1/audit/trail
+GET /api/v1/compliance/report
+POST /api/v1/compliance/export
+```
+
+### Monitoring
+```bash
+GET /api/v1/monitoring/health
+GET /api/v1/monitoring/metrics
+GET /api/v1/monitoring/alerts
+```
+
+---
+
+## 🔧 **Development**
+
+### Running Tests
+```bash
+# Run all tests
+pytest
+
+# Run with coverage
+pytest --cov=ipo_reminder --cov-report=html
+
+# Run specific test file
+pytest tests/test_enterprise_orchestrator.py
+```
+
+### Code Quality
+```bash
+# Format code
+black ipo_reminder/
+isort ipo_reminder/
+
+# Lint code
+flake8 ipo_reminder/
+
+# Type checking
+mypy ipo_reminder/
+```
+
+### Database Migrations
+```bash
+# Create new migration
+alembic revision --autogenerate -m "Add new table"
+
+# Run migrations
+alembic upgrade head
+
+# Downgrade
+alembic downgrade -1
+```
+
+---
+
+## 📈 **Monitoring & Alerting**
+
+### Health Checks
+The system provides comprehensive health monitoring:
+
+- **Database Connectivity**: Connection pool status and query performance
+- **Cache Performance**: Hit rates, memory usage, and eviction stats
+- **API Health**: Circuit breaker status and response times
+- **System Resources**: CPU, memory, and disk usage
+- **Business Metrics**: IPO processing rates and success rates
+
+### Alert Types
+- **System Alerts**: Database issues, cache failures, API outages
+- **Performance Alerts**: High latency, low throughput, resource exhaustion
+- **Security Alerts**: Failed authentication, suspicious activities
+- **Business Alerts**: IPO processing failures, email delivery issues
+
+### Metrics Dashboard
+Access metrics at `/api/v1/metrics` or integrate with:
+- **Prometheus**: Native Prometheus metrics endpoint
+- **Grafana**: Pre-built dashboards available
+- **ELK Stack**: Structured logging for Kibana visualization
+
+---
+
+## 🔒 **Security Features**
+
+### Data Protection
+- **Encryption at Rest**: All sensitive data encrypted using AES-256
+- **Encryption in Transit**: TLS 1.3 for all network communications
+- **Key Management**: Secure key rotation and management
+- **Data Masking**: PII data masked in logs and reports
+
+### Access Control
+- **JWT Authentication**: Token-based authentication with expiration
+- **Role-Based Access**: Granular permissions system
+- **API Rate Limiting**: Configurable rate limits per endpoint
+- **IP Whitelisting**: Restrict access to trusted networks
+
+### Audit & Compliance
+- **Complete Audit Trail**: All actions logged with tamper-proof checksums
+- **Compliance Reports**: Automated generation of compliance reports
+- **Data Retention**: Configurable retention policies
+- **GDPR Compliance**: Data portability and right to erasure
+
+---
+
+## 🚀 **Deployment Options**
+
+### Docker Deployment
+```dockerfile
+FROM python:3.11-slim
+
+WORKDIR /app
+COPY requirements.txt .
+RUN pip install -r requirements.txt
+
+COPY . .
+RUN python setup_database.py setup
+
+EXPOSE 8000
+CMD ["python", "-m", "ipo_reminder.enterprise_orchestrator"]
+```
+
+### Kubernetes Deployment
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ipo-reminder
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: ipo-reminder
+  template:
+    metadata:
+      labels:
+        app: ipo-reminder
+    spec:
+      containers:
+      - name: ipo-reminder
+        image: your-registry/ipo-reminder:latest
+        envFrom:
+        - secretRef:
+            name: ipo-reminder-secrets
+        ports:
+        - containerPort: 8000
+```
+
+### Cloud Deployment
+- **AWS**: ECS, EKS, or Lambda
+- **GCP**: Cloud Run, GKE, or Cloud Functions
+- **Azure**: Container Instances, AKS, or Functions
+- **Heroku**: Standard deployment with add-ons
+
+---
+
+## 📞 **Support & Documentation**
+
+### Documentation
+- [API Documentation](docs/api.md)
+- [Deployment Guide](docs/deployment.md)
+- [Configuration Guide](docs/configuration.md)
+- [Troubleshooting](docs/troubleshooting.md)
+
+### Support
+- **Issues**: [GitHub Issues](https://github.com/your-username/ipo-reminder/issues)
+- **Discussions**: [GitHub Discussions](https://github.com/your-username/ipo-reminder/discussions)
+- **Email**: support@ipo-reminder.com
+
+### Contributing
+1. Fork the repository
+2. Create a feature branch
+3. Make your changes
+4. Add tests
+5. Submit a pull request
+
+---
+
+## 📄 **License**
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+---
+
+## 🙏 **Acknowledgments**
+
+- **BSE India** and **NSE India** for providing official APIs
+- **Chittorgarh** for IPO data and analysis
+- **Zerodha** and **Moneycontrol** for additional data sources
+- **Open source community** for amazing libraries and tools
+
+---
+
+*Built with ❤️ for the Indian investment community*

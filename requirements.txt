@@ -6,6 +6,12 @@ python-dateutil>=2.9.0.post0
 pandas>=2.2.2
 python-dotenv>=0.19.0
 
+# Database & Caching
+sqlalchemy>=2.0.0
+alembic>=1.12.0
+redis>=5.0.0
+psycopg2-binary>=2.9.0  # For PostgreSQL
+
 # Email and validation
 secure-smtplib>=0.1.1
 email-validator>=2.1.0
@@ -19,11 +25,33 @@ numpy>=1.24.0
 scipy>=1.10.0
 scikit-learn>=1.3.0
 
-# Logging and monitoring
+# Monitoring & Alerting
 structlog>=23.1.0
+sentry-sdk>=1.30.0
+prometheus-client>=0.17.0
+
+# Circuit Breaker
+circuitbreaker>=2.0.0
+
+# Official API clients
+bse-python>=1.0.0
+nsepython>=1.0.0
 
 # Development and testing
 pytest>=7.4.0
 pytest-cov>=4.1.0
 black>=23.0.0
 flake8>=6.0.0
+pytest-asyncio>=0.21.0
+
+# Async support
+aiohttp>=3.8.0
+asyncio>=3.4.3
+
+# Enterprise additions
+dataclasses-json>=0.6.0
+pydantic>=2.0.0
+cryptography>=41.0.0
+bcrypt>=4.0.0
+pyjwt>=2.8.0
+schedule>=1.2.0
