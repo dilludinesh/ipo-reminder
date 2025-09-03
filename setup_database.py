@@ -33,7 +33,7 @@ def setup_database():
             # Index for IPO data queries
             conn.execute(text("""
                 CREATE INDEX IF NOT EXISTS idx_ipo_data_dates
-                ON ipo_data (ipo_open_date, ipo_close_date);
+                ON ipo_data (open_date, close_date);
             """))
 
             conn.execute(text("""
