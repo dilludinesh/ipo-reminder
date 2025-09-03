@@ -1,5 +1,7 @@
 name: Enterprise IPO Reminder (GitHub-Only)
 
+# Workflow triggered: Manual run via code push
+
 on:
   schedule:
     # Run daily at 6:00 AM IST (12:30 AM UTC)
