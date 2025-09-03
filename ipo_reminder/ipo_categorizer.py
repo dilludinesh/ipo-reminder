@@ -212,6 +212,10 @@ def format_ipo_email_html(today_date, ipos: List) -> Tuple[str, str, str]:
         company_name = sanitize_input(getattr(ipo, 'name', 'Unknown Company'))
         price_band = sanitize_input(getattr(ipo, 'price_band', None) or getattr(ipo, 'price_range', 'Price TBA'))
         
+        # Get platform information
+        platform = getattr(ipo, 'platform', 'Mainboard')
+        platform_display = f" ({platform})"
+        
         # Use enhanced analysis
         analysis = analyzer.analyze_ipo_comprehensive(company_name, price_band)
         thesis = generate_investment_thesis(company_name, price_band)
@@ -227,7 +231,7 @@ def format_ipo_email_html(today_date, ipos: List) -> Tuple[str, str, str]:
         risk_text = f"Risk: {risk_analysis['level']} ({risk_analysis['score']}/100)"
         
         text_lines.extend([
-            f"{i}. {company_name}",
+            f"{i}. {company_name}{platform_display}",
             f"   Price: {price_band}",
             f"   Recommendation: {action} ({confidence_text})",
             f"   Risk Assessment: {risk_text}",
@@ -246,6 +250,10 @@ def format_ipo_email_html(today_date, ipos: List) -> Tuple[str, str, str]:
         company_name = sanitize_input(getattr(ipo, 'name', 'Unknown Company'))
         price_band = sanitize_input(getattr(ipo, 'price_band', None) or getattr(ipo, 'price_range', 'Price TBA'))
         
+        # Get platform information
+        platform = getattr(ipo, 'platform', 'Mainboard')
+        platform_display = f" ({platform})"
+        
         analysis = analyzer.analyze_ipo_comprehensive(company_name, price_band)
         thesis = generate_investment_thesis(company_name, price_band)
         risk_analysis = calculate_risk_score(company_name, price_band)
@@ -262,7 +270,7 @@ def format_ipo_email_html(today_date, ipos: List) -> Tuple[str, str, str]:
 
         html_parts.append(f"""
         <div style="margin-bottom: 20px; padding: 15px; border-left: 5px solid {rec_color}; background-color: #f9f9f9; border-radius: 5px;">
-            <h3 style="margin-top: 0; margin-bottom: 10px; color: #444;">{company_name}</h3>
+            <h3 style="margin-top: 0; margin-bottom: 10px; color: #444;">{company_name}{platform_display}</h3>
             <p style="margin: 5px 0;"><strong>Price:</strong> {price_band}</p>
             <p style="margin: 5px 0;"><strong>Recommendation:</strong> <span style="color: {rec_color}; font-weight: bold;">{rec_text}</span></p>
             <p style="margin: 5px 0;"><strong>Confidence:</strong> {analysis.confidence_score}%</p>

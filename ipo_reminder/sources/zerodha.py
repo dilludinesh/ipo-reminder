@@ -21,6 +21,7 @@ class ZerodhaIPO:
     ipo_dates: str
     listing_date: str
     price_range: str
+    platform: str  # "Mainboard" or "SME"
     open_date: Optional[date] = None
     close_date: Optional[date] = None
 
@@ -75,13 +76,16 @@ def get_zerodha_ipos() -> List[ZerodhaIPO]:
                         if ipo_symbol_span:
                             # Extract just the symbol text, excluding SME type
                             symbol_text = ipo_symbol_span.get_text(strip=True)
+                            # Check if it's an SME IPO
+                            is_sme = 'SME' in symbol_text.upper()
                             # Remove SME from symbol if present
                             symbol = re.sub(r'\bSME\b', '', symbol_text, flags=re.I).strip()
+                        else:
+                            is_sme = False
+                            symbol = ""
                         
-                        # If we couldn't parse the spans, fall back to raw text
-                        if not company_name:
-                            raw_text = name_cell.get_text(strip=True)
-                            company_name = _extract_company_name_from_raw(raw_text)
+                        # Determine platform
+                        platform = "SME" if is_sme else "Mainboard"
                         
                         # Clean the company name
                         name = _clean_company_name(company_name)
@@ -100,6 +104,7 @@ def get_zerodha_ipos() -> List[ZerodhaIPO]:
                             ipo_dates=ipo_dates,
                             listing_date=listing_date,
                             price_range=price_range,
+                            platform=platform,
                             open_date=open_date,
                             close_date=close_date
                         )

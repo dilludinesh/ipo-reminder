@@ -36,8 +36,12 @@ def handler(dry_run=False):
         try:
             # Convert to IPOInfo format for email
             from .sources.chittorgarh import IPOInfo
+            # Include platform information in the name
+            platform_display = f" ({z_ipo.platform})" if z_ipo.platform != "Mainboard" else ""
+            enhanced_name = f"{z_ipo.name}{platform_display}"
+            
             ipo = IPOInfo(
-                name=z_ipo.name,
+                name=enhanced_name,
                 detail_url=None,
                 gmp_url=None,
                 open_date=z_ipo.open_date,
