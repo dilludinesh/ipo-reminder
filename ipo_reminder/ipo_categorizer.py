@@ -240,8 +240,6 @@ def format_ipo_email_html(today_date, ipos: List) -> Tuple[str, str, str]:
     # --- Enhanced HTML Body Generation ---
     html_parts = [f"""
     <div style="font-family: Arial, sans-serif; color: #333; max-width: 600px; margin: auto;">
-        <h2 style="color: #333; margin-bottom: 20px;">IPO Reminder - {formatted_date}</h2>
-        <p style="margin-bottom: 20px; color: #666;">{summary['total_ipos']} IPOs • {summary['main_board']} Main Board • {summary['sme']} SME</p>
     """]
 
     for ipo in ipos:
