@@ -166,15 +166,41 @@ jobs:
         echo "📧 Recipient: $RECIPIENT_EMAIL"
         echo ""
 
-        # Run enterprise orchestrator
+        # Test network connectivity to IPO data sources
+        echo "🌐 Testing network connectivity..."
+        if curl -s --max-time 10 https://www.chittorgarh.com > /dev/null; then
+            echo "✅ Chittorgarh website accessible"
+        else
+            echo "⚠️  Chittorgarh website not accessible (will use fallback)"
+        fi
+
+        if curl -s --max-time 10 https://www.moneycontrol.com > /dev/null; then
+            echo "✅ Moneycontrol website accessible"
+        else
+            echo "⚠️  Moneycontrol website not accessible (will use fallback)"
+        fi
+        echo ""
+
+        # Run enterprise orchestrator with error handling
         echo "🏢 Starting Enterprise IPO Orchestrator..."
         cd /home/runner/work/ipo-reminder/ipo-reminder
 
-        # Run with error handling
-        if python -m ipo_reminder; then
+        # Create logs directory if it doesn't exist
+        mkdir -p logs
+
+        # Set Python path
+        export PYTHONPATH="/home/runner/work/ipo-reminder/ipo-reminder:$PYTHONPATH"
+
+        # Run with timeout and error handling
+        timeout 600 python -m ipo_reminder 2>&1 | tee logs/workflow_output.log
+
+        # Check if the command succeeded
+        if [ $? -eq 0 ]; then
             echo "✅ IPO Reminder execution completed successfully!"
         else
             echo "❌ IPO Reminder execution failed!"
+            echo "📋 Last 20 lines of output:"
+            tail -20 logs/workflow_output.log
             exit 1
         fi
 
