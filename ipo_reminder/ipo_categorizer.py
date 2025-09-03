@@ -235,7 +235,6 @@ def format_ipo_email_html(today_date, ipos: List) -> Tuple[str, str, str]:
             ""
         ])
     
-    text_lines.append("---\nYour personal investment guide - based on comprehensive fundamental analysis.")
     text_body = "\n".join(text_lines)
 
     # --- Enhanced HTML Body Generation ---
@@ -279,10 +278,6 @@ def format_ipo_email_html(today_date, ipos: List) -> Tuple[str, str, str]:
         """)
 
     html_parts.append("""
-        </div>
-        <div style="background-color: #f2f2f2; color: #666; padding: 15px; text-align: center; font-size: 12px;">
-            <p style="margin: 0;">This guide is based on automated fundamental analysis. Always do your own research before investing.</p>
-            <p style="margin: 5px 0;"><strong>Disclaimer:</strong> Past performance is not indicative of future results. IPO investments carry risk.</p>
         </div>
     </div>
     """)
