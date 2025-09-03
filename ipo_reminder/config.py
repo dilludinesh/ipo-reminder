@@ -39,10 +39,24 @@ NSE_API_KEY = os.getenv("NSE_API_KEY")
 NSE_API_BASE_URL = os.getenv("NSE_API_BASE_URL", "https://www.nseindia.com/api")
 NSE_API_TIMEOUT = int(os.getenv("NSE_API_TIMEOUT", "30"))
 
+# Rate Limiting Configuration
+RATE_LIMIT_REQUESTS_PER_SECOND = int(os.getenv("RATE_LIMIT_REQUESTS_PER_SECOND", "10"))
+RATE_LIMIT_BURST_CAPACITY = int(os.getenv("RATE_LIMIT_BURST_CAPACITY", "20"))
+RATE_LIMIT_WINDOW_SECONDS = int(os.getenv("RATE_LIMIT_WINDOW_SECONDS", "60"))
+
 # Circuit Breaker Configuration
 CIRCUIT_BREAKER_FAILURE_THRESHOLD = int(os.getenv("CIRCUIT_BREAKER_FAILURE_THRESHOLD", "5"))
-CIRCUIT_BREAKER_RECOVERY_TIMEOUT = int(os.getenv("CIRCUIT_BREAKER_RECOVERY_TIMEOUT", "60"))
+CIRCUIT_BREAKER_RECOVERY_TIMEOUT = int(os.getenv("CIRCUIT_BREAKER_RECOVERY_TIMEOUT", "300"))  # 5 minutes
+CIRCUIT_BREAKER_HALF_OPEN_MAX_REQUESTS = int(os.getenv("CIRCUIT_BREAKER_HALF_OPEN_MAX_REQUESTS", "3"))
 CIRCUIT_BREAKER_EXPECTED_EXCEPTION = Exception
+
+# API Specific Rate Limits (requests per minute)
+BSE_API_RATE_LIMIT = int(os.getenv("BSE_API_RATE_LIMIT", "100"))
+NSE_API_RATE_LIMIT = int(os.getenv("NSE_API_RATE_LIMIT", "50"))
+
+# Bulkhead Configuration
+MAX_CONCURRENT_DB_REQUESTS = int(os.getenv("MAX_CONCURRENT_DB_REQUESTS", "50"))
+MAX_CONCURRENT_API_REQUESTS = int(os.getenv("MAX_CONCURRENT_API_REQUESTS", "20"))
 
 # Monitoring Configuration
 MONITORING_ENABLED = os.getenv("MONITORING_ENABLED", "true").lower() == "true"
@@ -194,9 +208,34 @@ def get_api_config() -> dict:
 def get_monitoring_config() -> dict:
     """Get monitoring configuration dictionary."""
     return {
-        'enabled': MONITORING_ENABLED,
-        'metrics_retention_days': METRICS_RETENTION_DAYS,
-        'alert_cooldown_minutes': ALERT_COOLDOWN_MINUTES
+        "enabled": MONITORING_ENABLED,
+        "metrics_retention_days": METRICS_RETENTION_DAYS,
+        "alert_cooldown_minutes": ALERT_COOLDOWN_MINUTES,
+    }
+
+def get_rate_limit_config() -> dict:
+    """Get rate limiting configuration dictionary."""
+    return {
+        "requests_per_second": RATE_LIMIT_REQUESTS_PER_SECOND,
+        "burst_capacity": RATE_LIMIT_BURST_CAPACITY,
+        "time_window": RATE_LIMIT_WINDOW_SECONDS,
+        "bse_api_limit": BSE_API_RATE_LIMIT,
+        "nse_api_limit": NSE_API_RATE_LIMIT
+    }
+
+def get_circuit_breaker_config() -> dict:
+    """Get circuit breaker configuration dictionary."""
+    return {
+        "failure_threshold": CIRCUIT_BREAKER_FAILURE_THRESHOLD,
+        "recovery_timeout": CIRCUIT_BREAKER_RECOVERY_TIMEOUT,
+        "half_open_max_requests": CIRCUIT_BREAKER_HALF_OPEN_MAX_REQUESTS
+    }
+
+def get_bulkhead_config() -> dict:
+    """Get bulkhead configuration dictionary."""
+    return {
+        "max_concurrent_db_requests": MAX_CONCURRENT_DB_REQUESTS,
+        "max_concurrent_api_requests": MAX_CONCURRENT_API_REQUESTS
     }
 
 def get_compliance_config() -> dict:

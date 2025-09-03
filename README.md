@@ -10,6 +10,41 @@
 
 ---
 
+## 🧪 **Testing**
+
+### Running Tests
+
+To run the test suite, first install the test dependencies:
+
+```bash
+pip install -r requirements-test.txt
+```
+
+Then run the tests with coverage:
+
+```bash
+pytest --cov=ipo_reminder --cov-report=term-missing
+```
+
+### Test Coverage
+
+To generate an HTML coverage report:
+
+```bash
+pytest --cov=ipo_reminder --cov-report=html
+open htmlcov/index.html
+```
+
+### Test Structure
+
+- `tests/` - Contains all test files
+  - `conftest.py` - Pytest configuration and fixtures
+  - `test_database.py` - Database operations tests
+  - `test_cache.py` - Cache manager tests
+  - `test_emailer.py` - Email notification tests
+  - `test_orchestrator.py` - Main orchestrator tests
+  - `test_official_apis.py` - BSE/NSE API client tests
+
 ## 🚀 **Enterprise Features (v3.0)**
 
 ### 🏢 **Enterprise Architecture**

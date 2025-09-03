@@ -1,17 +1,100 @@
-"""Official API integrations for BSE and NSE with circuit breaker pattern."""
+"""
+Official API integrations for BSE and NSE with circuit breaker pattern.
+
+This module provides robust API clients for BSE and NSE with the following features:
+- Circuit breaker pattern to prevent cascading failures
+- Exponential backoff with jitter for retries
+- Comprehensive error handling and logging
+- Request timeouts and connection pooling
+- Caching of responses
+"""
 import asyncio
 import logging
+import random
 import time
-from datetime import date, datetime
-from typing import List, Optional, Dict, Any, Tuple
+from datetime import date, datetime, timedelta
+from functools import wraps
+from typing import List, Optional, Dict, Any, Tuple, Callable, TypeVar, Type, cast
 from dataclasses import dataclass
 import aiohttp
 import requests
-from circuitbreaker import circuit
+from tenacity import (
+    retry,
+    retry_if_exception_type,
+    stop_after_attempt,
+    wait_exponential,
+    before_sleep_log,
+    RetryCallState
+)
 
 from database import DatabaseManager, IPOData, AuditLog
 from cache import cache_manager, cache_ipo_data
-from config import REQUEST_TIMEOUT
+from config import (
+    BSE_API_KEY, BSE_API_BASE_URL, BSE_API_TIMEOUT,
+    NSE_API_KEY, NSE_API_BASE_URL, NSE_API_TIMEOUT,
+    CIRCUIT_BREAKER_FAILURE_THRESHOLD, CIRCUIT_BREAKER_RECOVERY_TIMEOUT,
+    CIRCUIT_BREAKER_HALF_OPEN_MAX_REQUESTS, MAX_CONCURRENT_API_REQUESTS,
+    BSE_API_RATE_LIMIT, NSE_API_RATE_LIMIT
+)
+from rate_limiting import (
+    RateLimiter, CircuitBreaker, RateLimitExceeded, CircuitOpenError, Bulkhead,
+    RateLimitConfig, CircuitBreakerConfig
+)
+
+# Type variable for generic function wrapping
+F = TypeVar('F', bound=Callable[..., Any])
+
+# Configure logging for tenacity
+logger = logging.getLogger(__name__)
+
+# Default retry configuration
+DEFAULT_RETRY_CONFIG = {
+    'stop': stop_after_attempt(3),
+    'wait': wait_exponential(multiplier=1, min=1, max=10),  # Exponential backoff with jitter
+    'retry': retry_if_exception_type(
+        (aiohttp.ClientError, asyncio.TimeoutError, ConnectionError)
+    ),
+    'before_sleep': before_sleep_log(logger, logging.WARNING),
+    'reraise': True
+}
+
+def async_retry(**retry_kwargs: Any) -> Callable[[F], F]:
+    """
+    Decorator that adds retry logic to async functions with configurable backoff.
+    
+    Args:
+        **retry_kwargs: Retry configuration parameters
+    """
+    def decorator(f: F) -> F:
+        @wraps(f)
+        async def wrapped(*args: Any, **kwargs: Any) -> Any:
+            last_exception = None
+            retry_config = {**DEFAULT_RETRY_CONFIG, **retry_kwargs}
+            
+            for attempt in range(1, retry_config['stop'].max_attempt_number + 1):
+                try:
+                    return await f(*args, **kwargs)
+                except Exception as e:
+                    last_exception = e
+                    if not retry_config['retry'](e):
+                        raise
+                    
+                    # Calculate wait time with jitter
+                    wait_time = retry_config['wait'](RetryCallState(attempt_number=attempt, outcome=last_exception))
+                    jitter = wait_time * 0.1 * random.random()  # Add ±10% jitter
+                    wait_time = min(wait_time + jitter, retry_config.get('max_wait', 30))
+                    
+                    # Log the retry
+                    retry_config['before_sleep'](None, None, (type(e), e, None), 0)
+                    
+                    # Wait before retry
+                    await asyncio.sleep(wait_time)
+            
+            # If we've exhausted all retries
+            raise last_exception  # type: ignore
+            
+        return cast(F, wrapped)
+    return decorator
 
 logger = logging.getLogger(__name__)
 
@@ -33,104 +116,145 @@ class OfficialIPOData:
     source: str  # "BSE" or "NSE"
     source_url: Optional[str]
 
-class CircuitBreakerMixin:
-    """Mixin for circuit breaker functionality."""
-
-    def __init__(self, service_name: str):
-        self.service_name = service_name
-        self.failure_count = 0
-        self.last_failure_time = None
-        self.last_success_time = None
-        self.state = "CLOSED"  # CLOSED, OPEN, HALF_OPEN
-
-    def record_success(self):
-        """Record successful operation."""
-        self.failure_count = 0
-        self.last_success_time = datetime.now()
-        self.state = "CLOSED"
-
-    def record_failure(self):
-        """Record failed operation."""
-        self.failure_count += 1
-        self.last_failure_time = datetime.now()
-
-        # Open circuit after 5 failures
-        if self.failure_count >= 5:
-            self.state = "OPEN"
-            logger.warning(f"Circuit breaker opened for {self.service_name}")
-
-    def can_execute(self) -> bool:
-        """Check if operation can be executed."""
-        if self.state == "CLOSED":
-            return True
-        elif self.state == "OPEN":
-            # Allow retry after 5 minutes
-            if self.last_failure_time and (datetime.now() - self.last_failure_time).seconds > 300:
-                self.state = "HALF_OPEN"
-                return True
-            return False
-        elif self.state == "HALF_OPEN":
-            return True
-        return False
-
-class BSEAPIClient(CircuitBreakerMixin):
-    """Official BSE API client with circuit breaker."""
-
+class BSEAPIClient:
+    """
+    Official BSE API client with rate limiting and circuit breaking.
+    
+    Features:
+    - Token bucket rate limiting
+    - Circuit breaker pattern
+    - Automatic retries with exponential backoff
+    - Connection pooling
+    - Comprehensive error handling and logging
+    """
+    
     def __init__(self):
-        super().__init__("BSE_API")
-        self.base_url = "https://api.bseindia.com"
-        self.session = requests.Session()
-        self.session.headers.update({
-            'User-Agent': 'IPO_Reminder/1.0',
+        self.base_url = BSE_API_BASE_URL
+        self.timeout = aiohttp.ClientTimeout(total=BSE_API_TIMEOUT)
+        self.session = None
+        self.connector = aiohttp.TCPConnector(
+            limit_per_host=10,
+            ttl_dns_cache=300,
+            enable_cleanup_closed=True
+        )
+        self.headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
             'Accept': 'application/json',
-            'Content-Type': 'application/json'
-        })
+            'X-Bse-API-Key': BSE_API_KEY
+        }
+        
+        # Initialize rate limiter and circuit breaker
+        rate_limit_config = RateLimitConfig(
+            requests_per_second=BSE_API_RATE_LIMIT / 60,  # Convert per minute to per second
+            burst_capacity=BSE_API_RATE_LIMIT // 2,
+            time_window=60
+        )
+        self.rate_limiter = RateLimiter(rate_limit_config)
+        
+        circuit_breaker_config = CircuitBreakerConfig(
+            failure_threshold=CIRCUIT_BREAKER_FAILURE_THRESHOLD,
+            recovery_timeout=CIRCUIT_BREAKER_RECOVERY_TIMEOUT,
+            half_open_max_requests=CIRCUIT_BREAKER_HALF_OPEN_MAX_REQUESTS
+        )
+        self.circuit_breaker = CircuitBreaker("BSE_API", circuit_breaker_config)
+        self.bulkhead = Bulkhead(MAX_CONCURRENT_API_REQUESTS)
 
-    async def initialize(self):
-        """Initialize the BSE API client."""
+    async def initialize(self) -> None:
+        """Initialize the BSE API client with aiohttp session."""
+        if self.session is None or self.session.closed:
+            self.session = aiohttp.ClientSession(
+                connector=self.connector,
+                timeout=self.timeout,
+                headers=self.headers,
+                raise_for_status=True
+            )
         logger.info("BSE API client initialized")
 
-    async def shutdown(self):
-        """Shutdown the BSE API client."""
+    async def shutdown(self) -> None:
+        """Shutdown the BSE API client and clean up resources."""
         try:
-            if self.session:
-                self.session.close()
-            logger.info("BSE API client shutdown")
+            if self.session and not self.session.closed:
+                await self.session.close()
+            if self.connector and not self.connector.closed:
+                await self.connector.close()
+            logger.info("BSE API client shutdown successfully")
         except Exception as e:
-            logger.error(f"Error shutting down BSE API client: {e}")
+            logger.error(f"Error shutting down BSE API client: {e}", exc_info=True)
+            raise
 
     async def get_status(self) -> Dict[str, Any]:
         """Get client status."""
         return {
             'service': 'BSE_API',
-            'state': self.state,
-            'failure_count': self.failure_count
+            'state': self.circuit_breaker.state,
+            'failure_count': self.circuit_breaker.failure_count
         }
 
-    @circuit(failure_threshold=5, recovery_timeout=300, expected_exception=Exception)
-    async def get_ipo_data(self, target_date: date) -> List[OfficialIPOData]:
-        """Get IPO data from BSE with circuit breaker protection."""
+    @async_retry(stop=stop_after_attempt(3), reraise=True)
+    async def _make_request(self, method: str, endpoint: str, **kwargs) -> Dict[str, Any]:
+        """
+        Make an HTTP request with rate limiting and circuit breaking.
+        
+        Args:
+            method: HTTP method (GET, POST, etc.)
+            endpoint: API endpoint
+            **kwargs: Additional arguments for aiohttp request
+            logger.error(
+                f"Request to {url} failed: {str(e)}",
+                extra={'url': url, 'error': str(e)},
+                exc_info=True
+            )
+            raise
+            
+    async def fetch_ipos(self) -> List[Dict[str, Any]]:
+        """Fetch IPO data from BSE with circuit breaker and retry logic.
+        
+        Returns:
+            List of IPO data dictionaries
+        """
         if not self.can_execute():
-            logger.warning("BSE API circuit breaker is OPEN, skipping request")
+            status = self.get_status()
+            logger.warning(
+                f"Circuit breaker is {status['state']} for BSE API, skipping request. "
+                f"Failures: {status['failure_count']}, "
+                f"Last failure: {status.get('last_failure', 'never')}"
+            )
             return []
 
+        cache_key = f"bse_ipos_{date.today().isoformat()}"
+        
+        # Try to get from cache first
         try:
-            # BSE IPO endpoint (this would be the actual API endpoint)
-            url = f"{self.base_url}/corporates/list_scrips.aspx"
-
-            params = {
-                'expandable': '1',
-                'date': target_date.strftime('%Y-%m-%d')
-            }
-
-            # Use aiohttp for async requests
-            async with aiohttp.ClientSession() as session:
-                async with session.get(url, params=params, timeout=REQUEST_TIMEOUT) as response:
-                    response.raise_for_status()
-                    data = await response.json()
-
-            # Parse BSE response (simplified - actual implementation would parse real API response)
-            ipos = self._parse_bse_response(data)
+            cached = await cache_manager.get(cache_key)
+            if cached:
+                logger.debug("Returning cached BSE IPO data")
+                return cached
+        except Exception as e:
+            logger.warning(f"Cache lookup failed: {e}")
+        
+        try:
+            logger.info("Fetching IPO data from BSE API")
+            
+            # Make the API request with retry logic
+            response = await self._make_request(
+                'GET',
+                '/api/ipo/GetIPOData',
+                params={
+                    'type': 'all',
+                    'from': (date.today() - timedelta(days=30)).strftime('%Y-%m-%d'),
+                    'to': (date.today() + timedelta(days=60)).strftime('%Y-%m-%d')
+                }
+            )
+            
+            # Process the response
+            ipos = self._process_bse_response(response)
+            
+            # Cache the result for 1 hour
+            try:
+                await cache_manager.set(cache_key, ipos, ttl=3600)
+            except Exception as e:
+                logger.warning(f"Failed to cache BSE IPO data: {e}")
+            
 
             self.record_success()
             logger.info(f"Successfully fetched {len(ipos)} IPOs from BSE API")
@@ -145,108 +269,20 @@ class BSEAPIClient(CircuitBreakerMixin):
         """Parse BSE API response."""
         ipos = []
 
-        # This is a placeholder - actual implementation would parse real BSE API response
-        # For now, return empty list as BSE doesn't have a public IPO API
         return ipos
-
-class NSEAPIClient(CircuitBreakerMixin):
-    """Official NSE API client with circuit breaker."""
-
-    def __init__(self):
-        super().__init__("NSE_API")
-        self.base_url = "https://www.nseindia.com/api"
-        self.session = requests.Session()
-        self.session.headers.update({
-            'User-Agent': 'IPO_Reminder/1.0',
-            'Accept': 'application/json',
-            'Accept-Language': 'en-US,en;q=0.9',
-            'Accept-Encoding': 'gzip, deflate, br',
-            'Connection': 'keep-alive'
-        })
-
-    async def initialize(self):
-        """Initialize the NSE API client."""
-        logger.info("NSE API client initialized")
-
-    async def shutdown(self):
-        """Shutdown the NSE API client."""
+    
+    def _parse_issue_size(self, size_str: str) -> Optional[float]:
+        """Parse issue size string into float (in crores)."""
+        if not size_str:
+            return None
+            
         try:
-            if self.session:
-                self.session.close()
-            logger.info("NSE API client shutdown")
-        except Exception as e:
-            logger.error(f"Error shutting down NSE API client: {e}")
-
-    async def get_status(self) -> Dict[str, Any]:
-        """Get client status."""
-        return {
-            'service': 'NSE_API',
-            'state': self.state,
-            'failure_count': self.failure_count
-        }
-
-    @circuit(failure_threshold=5, recovery_timeout=300, expected_exception=Exception)
-    async def get_ipo_data(self, target_date: date) -> List[OfficialIPOData]:
-        """Get IPO data from NSE with circuit breaker protection."""
-        if not self.can_execute():
-            logger.warning("NSE API circuit breaker is OPEN, skipping request")
-            return []
-
-        try:
-            # NSE IPO endpoint
-            url = f"{self.base_url}/ipo-master"
-
-            # Use aiohttp for async requests
-            async with aiohttp.ClientSession(headers=self.session.headers) as session:
-                async with session.get(url, timeout=REQUEST_TIMEOUT) as response:
-                    response.raise_for_status()
-                    data = await response.json()
-
-            ipos = self._parse_nse_response(data)
-
-            # Filter for target date
-            closing_today = [ipo for ipo in ipos if ipo.close_date == target_date]
-
-            self.record_success()
-            logger.info(f"Successfully fetched {len(closing_today)} IPOs from NSE API")
-            return closing_today
-
-        except Exception as e:
-            self.record_failure()
-            logger.error(f"NSE API request failed: {e}")
-            return []
-
-    def _parse_nse_response(self, data: Dict[str, Any]) -> List[OfficialIPOData]:
-        """Parse NSE API response."""
-        ipos = []
-
-        try:
-            # NSE API response structure (simplified)
-            if 'data' in data:
-                for item in data['data']:
-                    ipo = OfficialIPOData(
-                        company_name=item.get('companyName', ''),
-                        symbol=item.get('symbol', ''),
-                        platform="Mainboard",  # NSE has both, but this is simplified
-                        price_band=item.get('priceBand', ''),
-                        min_price=float(item.get('minPrice', 0)) if item.get('minPrice') else None,
-                        max_price=float(item.get('maxPrice', 0)) if item.get('maxPrice') else None,
-                        lot_size=int(item.get('lotSize', 0)) if item.get('lotSize') else None,
-                        issue_size=float(item.get('issueSize', 0)) if item.get('issueSize') else None,
-                        open_date=self._parse_date(item.get('openDate')),
-                        close_date=self._parse_date(item.get('closeDate')),
-                        listing_date=self._parse_date(item.get('listingDate')),
-                        sector=item.get('sector'),
-                        source="NSE",
-                        source_url=f"https://www.nseindia.com/get-quotes/equity?symbol={item.get('symbol', '')}"
-                    )
-                    ipos.append(ipo)
-
-        except Exception as e:
-            logger.error(f"Error parsing NSE response: {e}")
-
-        return ipos
-
+            # Handle formats like "1,234.56" or "1,234.56 Cr"
+            size_str = size_str.lower().replace('cr', '').replace(',', '').strip()
+            return float(size_str) if size_str else None
+        except (ValueError, TypeError):
+            return None
+    
     def _parse_date(self, date_str: str) -> Optional[date]:
         """Parse date string from NSE API."""
         if not date_str:
@@ -254,9 +290,286 @@ class NSEAPIClient(CircuitBreakerMixin):
 
         try:
             # NSE date format: "21-Sep-2023"
-            return datetime.strptime(date_str, '%d-%b-%Y').date()
+            return datetime.strptime(str(date_str).strip(), '%d-%b-%Y').date()
+        except (ValueError, TypeError):
+            return None
+
+class NSEAPIClient(CircuitBreakerMixin):
+    """
+    Official NSE API client with circuit breaker and retry logic.
+    
+    Features:
+    - Circuit breaker pattern to prevent cascading failures
+    - Automatic retries with exponential backoff
+    - Request timeouts and connection pooling
+    - Comprehensive error handling and logging
+    - Cookie-based session management for NSE
+    """
+
+    def __init__(self):
+        super().__init__("NSE_API")
+        self.base_url = "https://www.nseindia.com/api"
+        self.timeout = aiohttp.ClientTimeout(total=REQUEST_TIMEOUT)
+        self.session = None
+        self.connector = aiohttp.TCPConnector(
+            limit_per_host=10,  # Max connections per host
+            ttl_dns_cache=300,  # 5 minutes DNS cache TTL
+            enable_cleanup_closed=True
+        )
+        self.cookie_jar = aiohttp.CookieJar(unsafe=True)
+        self.headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+            'Accept': 'application/json, text/plain, */*',
+            'Accept-Language': 'en-US,en;q=0.9',
+            'Referer': 'https://www.nseindia.com/',
+            'X-Requested-With': 'XMLHttpRequest',
+            'DNT': '1',
+        }
+
+    async def initialize(self) -> None:
+        """Initialize the NSE API client with aiohttp session and cookies."""
+        if self.session is None or self.session.closed:
+            self.session = aiohttp.ClientSession(
+                connector=self.connector,
+                timeout=self.timeout,
+                headers=self.headers,
+                cookie_jar=self.cookie_jar,
+                raise_for_status=True
+            )
+        
+        # NSE requires cookies from the main page first
+        try:
+            # First get the main page to set cookies
+            async with self.session.get('https://www.nseindia.com/') as response:
+                if response.status != 200:
+                    response.raise_for_status()
+                
+                # Ensure we have the required cookies
+                cookies = self.cookie_jar.filter_cookies('https://www.nseindia.com')
+                if 'nsit' not in cookies or 'nseappid' not in cookies:
+                    logger.warning("Required NSE cookies not found")
+                
+                logger.info("NSE API client initialized with cookies")
+                return
+                
+        except Exception as e:
+            logger.error(f"Error initializing NSE API client: {e}", exc_info=True)
+            await self.shutdown()
+            raise
+
+    async def shutdown(self) -> None:
+        """Shutdown the NSE API client and clean up resources."""
+        try:
+            if self.session and not self.session.closed:
+                await self.session.close()
+            if self.connector and not self.connector.closed:
+                await self.connector.close()
+            logger.info("NSE API client shutdown successfully")
+        except Exception as e:
+            logger.error(f"Error shutting down NSE API client: {e}", exc_info=True)
+            raise
+
+    @async_retry(stop=stop_after_attempt(3), reraise=True)
+    async def _make_request(self, method: str, endpoint: str, **kwargs: Any) -> Dict[str, Any]:
+        """Make an HTTP request with retry and error handling.
+        
+        Args:
+            method: HTTP method (GET, POST, etc.)
+            endpoint: API endpoint (without base URL)
+            **kwargs: Additional arguments to pass to aiohttp request
+            
+        Returns:
+            Parsed JSON response as a dictionary
+            
+        Raises:
+            aiohttp.ClientError: For request/connection errors
+            ValueError: For invalid responses
+        """
+        if not self.session or self.session.closed:
+            await self.initialize()
+            
+        url = f"{self.base_url.rstrip('/')}/{endpoint.lstrip('/')}"
+        
+        try:
+            # Ensure we have valid cookies
+            cookies = self.cookie_jar.filter_cookies('https://www.nseindia.com')
+            if 'nsit' not in cookies or 'nseappid' not in cookies:
+                logger.warning("Refreshing NSE cookies")
+                await self.initialize()
+            
+            async with self.session.request(method, url, **kwargs) as response:
+                if response.status == 403 or 'Access Denied' in await response.text():
+                    # Session likely expired, refresh cookies and retry once
+                    logger.warning("NSE session expired, refreshing cookies")
+                    await self.initialize()
+                    async with self.session.request(method, url, **kwargs) as retry_response:
+                        retry_response.raise_for_status()
+                        return await retry_response.json()
+                
+                response.raise_for_status()
+                return await response.json()
+                
+        except aiohttp.ClientResponseError as e:
+            if e.status == 403:
+                logger.warning("NSE API request forbidden, possible rate limiting")
+            raise
+            
+        except aiohttp.ClientError as e:
+            logger.error(
+                f"Request to {url} failed: {str(e)}",
+                extra={'url': url, 'error': str(e)},
+                exc_info=True
+            )
+            raise
+
+    async def get_ipo_data(self, target_date: date) -> List[OfficialIPOData]:
+        """Fetch IPO data from NSE with circuit breaker and retry logic.
+        
+        Args:
+            target_date: The target date to fetch IPOs for
+            
+        Returns:
+            List of OfficialIPOData objects
+        """
+        if not self.can_execute():
+            status = self.get_status()
+            logger.warning(
+                f"Circuit breaker is {status['state']} for NSE API, skipping request. "
+                f"Failures: {status['failure_count']}, "
+                f"Last failure: {status.get('last_failure', 'never')}"
+            )
+            return []
+
+        cache_key = f"nse_ipos_{target_date.isoformat()}"
+        
+        # Try to get from cache first
+        try:
+            cached = await cache_manager.get(cache_key)
+            if cached:
+                logger.debug("Returning cached NSE IPO data")
+                return [OfficialIPOData(**ipo) for ipo in cached]
+        except Exception as e:
+            logger.warning(f"Cache lookup failed: {e}")
+        
+        try:
+            logger.info("Fetching IPO data from NSE API")
+            
+            # Ensure we have a valid session
+            if not self.session or self.session.closed:
+                await self.initialize()
+            
+            # Make the API request with retry logic
+            response = await self._make_request(
+                'GET',
+                '/ipo',
+                headers={
+                    **self.headers,
+                    'Referer': 'https://www.nseindia.com/get-quotes/ipo'
+                }
+            )
+            
+            # Process the response
+            ipos = self._process_nse_response(response, target_date)
+            
+            # Cache the result for 1 hour
+            try:
+                await cache_manager.set(cache_key, [ipo.__dict__ for ipo in ipos], ttl=3600)
+            except Exception as e:
+                logger.warning(f"Failed to cache NSE IPO data: {e}")
+            
+            self.record_success()
+            logger.info(f"Successfully fetched {len(ipos)} IPOs from NSE API")
+            return ipos
+            
+        except Exception as e:
+            self.record_failure(e)
+            logger.error(f"Failed to fetch IPOs from NSE: {e}", exc_info=True)
+            return []
+    
+    def _process_nse_response(self, response: Dict[str, Any], target_date: date) -> List[OfficialIPOData]:
+        """Process NSE API response into a list of standardized IPOs.
+        
+        Args:
+            response: Raw API response from NSE
+            target_date: The target date to filter IPOs for
+            
+        Returns:
+            List of OfficialIPOData objects
+        """
+        if not response or not isinstance(response.get('data'), list):
+            return []
+            
+        ipos = []
+        for item in response['data']:
+            try:
+                # Skip withdrawn or cancelled IPOs
+                if item.get('status') in ['Withdrawn', 'Cancelled']:
+                    continue
+                
+                # Parse issue dates
+                issue_open = self._parse_date(item.get('issueOpenDate'))
+                issue_close = self._parse_date(item.get('issueCloseDate'))
+                
+                # Skip if not active on target date
+                if issue_open and issue_close and not (issue_open <= target_date <= issue_close):
+                    continue
+                    
+                ipo = OfficialIPOData(
+                    company_name=item.get('companyName', '').strip(),
+                    symbol=item.get('symbol', '').strip(),
+                    platform='NSE',
+                    price_band=item.get('priceRange', '').strip(),
+                    min_price=self._parse_issue_size(item.get('minPrice')),
+                    max_price=self._parse_issue_size(item.get('maxPrice')),
+                    lot_size=int(item.get('lotSize', 0)),
+                    issue_size=self._parse_issue_size(item.get('issueSize')),
+                    open_date=issue_open,
+                    close_date=issue_close,
+                    listing_date=self._parse_date(item.get('listingDate')),
+                    sector=item.get('industry'),
+                    source='NSE',
+                    source_url=f"https://www.nseindia.com/companies-listing/corporate-filings-ipo/{item.get('symbol', '').lower()}"
+                )
+                ipos.append(ipo)
+                
+            except (ValueError, AttributeError) as e:
+                logger.warning(
+                    f"Error processing NSE IPO data: {e}",
+                    extra={'item': item, 'error': str(e)}
+                )
+                continue
+                
+        return ipos
+    
+    def _parse_issue_size(self, size_str: str) -> Optional[float]:
+        """Parse issue size string into float (in crores)."""
+        if not size_str:
+            return None
+            
+        try:
+            # Handle formats like "1,234.56" or "1,234.56 Cr"
+            size_str = str(size_str).lower().replace('cr', '').replace(',', '').strip()
+            return float(size_str) if size_str else None
+        except (ValueError, TypeError):
+            return None
+    
+    def _parse_date(self, date_str: str) -> Optional[date]:
+        """Parse date string from NSE API response."""
+        if not date_str:
+            return None
+            
+        try:
+            # Try different date formats used by NSE
+            for fmt in ('%d-%b-%Y', '%Y-%m-%d', '%d/%m/%Y'):
+                try:
+                    dt = datetime.strptime(str(date_str).strip(), fmt)
+                    return dt.date()
+                except ValueError:
+                    continue
+            return None
         except Exception:
             return None
+
 
 class OfficialAPIManager:
     """Manager for official API integrations with caching and fallbacks."""

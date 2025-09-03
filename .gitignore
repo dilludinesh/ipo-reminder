@@ -43,6 +43,30 @@ coverage.xml
 *.cover
 .hypothesis/
 .pytest_cache/
+.coverage.*
+,coverage
+*.cover,*,cover
+*.py,cover
+.hypothesis/
+.pytest_cache/
+.mypy_cache/
+.python-version
+.pytest_cache/
+.coverage
+htmlcov/
+*.egg-info/
+.eggs/
+build/
+dist/
+*.egg
+.mypy_cache/
+.pytest_cache/
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.coverage
+htmlcov/
 
 # Jupyter Notebook
 .ipynb_checkpoints
