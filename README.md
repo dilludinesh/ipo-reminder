@@ -1,8 +1,8 @@
-# Enterprise IPO Reminder System
+# Enterprise IPO Reminder System (GitHub-Only)
 
-**Enterprise-grade IPO monitoring and notification system** with official API integrations, database persistence, advanced analytics, and comprehensive compliance features.
+**Cloud-native IPO monitoring and notification system** running entirely on GitHub's infrastructure with official API integrations, database persistence, advanced analytics, and comprehensive compliance features.
 
-[![GitHub Actions](https://img.shields.io/badge/GitHub%20Actions-Automated-blue)](https://github.com/features/actions)
+[![GitHub Actions](https://img.shields.io/badge/GitHub%20Actions-Cloud%20Execution-blue)](https://github.com/features/actions)
 [![Python 3.11+](https://img.shields.io/badge/Python-3.11+-green)](https://www.python.org/)
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-15+-blue)](https://www.postgresql.org/)
 [![Redis](https://img.shields.io/badge/Redis-7+-red)](https://redis.io/)
@@ -105,46 +105,35 @@
 
 ---
 
-## 📋 **Prerequisites**
+## 📋 **Prerequisites (GitHub-Only)**
 
-### System Requirements
-- **Python**: 3.11 or higher
-- **PostgreSQL**: 15+ with PostGIS extension
-- **Redis**: 7.0+ with persistence enabled
-- **Memory**: 2GB RAM minimum, 4GB recommended
-- **Storage**: 10GB free space for logs and data
+### No Local Requirements
+- **Zero local setup** - Everything runs on GitHub's cloud infrastructure
+- **GitHub Account** - Required for repository access and Actions execution
+- **Email Account** - Gmail recommended for automated notifications
 
 ### API Keys (Optional but Recommended)
-- **BSE API Key**: For official BSE data
-- **NSE API Key**: For official NSE data
+- **BSE API Key**: For official BSE data (stored as GitHub secret)
+- **NSE API Key**: For official NSE data (stored as GitHub secret)
 
 ---
 
-## 🚀 **Quick Start**
+## 🚀 **Quick Start (GitHub-Only)**
 
-### Option 1: GitHub Codespaces (Recommended - Fully Remote)
+### Automated GitHub Execution
 
-For a **completely remote development and execution environment**, use GitHub Codespaces:
+Your IPO Reminder system runs **entirely on GitHub's cloud infrastructure** with no local setup required:
 
-1. **Open in Codespaces**: Go to https://github.com/dilludinesh/ipo-reminder and click "Code" → "Open with Codespaces"
-2. **Automatic Setup**: The environment sets up Python, PostgreSQL, Redis, and all dependencies
-3. **Start Developing**: Everything runs in the cloud with no local setup required
+1. **Configure Secrets**: Set up email and API credentials in GitHub repository secrets
+2. **Automatic Execution**: System runs daily at 9:00 AM IST via GitHub Actions
+3. **Cloud Database**: PostgreSQL and Redis services provided by GitHub Actions
+4. **Remote Monitoring**: View execution logs and status in GitHub Actions tab
 
-**Benefits:**
-- ✅ Zero local setup
-- ✅ Pre-configured development environment
-- ✅ All services (DB, cache) included
-- ✅ Automatic dependency installation
-- ✅ VS Code in the browser
+### GitHub Secrets Setup
 
-### Option 2: GitHub Actions Automation (Production)
-
-For **completely automated IPO reminders running remotely on GitHub**, set up GitHub Actions:
-
-#### Configure GitHub Secrets
-1. Go to your GitHub repository: https://github.com/dilludinesh/ipo-reminder
-2. Click **Settings** → **Secrets and variables** → **Actions**
-3. Add these secrets:
+Go to your GitHub repository: https://github.com/dilludinesh/ipo-reminder
+1. Click **Settings** → **Secrets and variables** → **Actions**
+2. Add these secrets:
 
 | Secret Name | Description | Example |
 |-------------|-------------|---------|
@@ -153,44 +142,25 @@ For **completely automated IPO reminders running remotely on GitHub**, set up Gi
 | `RECIPIENT_EMAIL` | Email to receive reminders | `recipient@email.com` |
 | `BSE_API_KEY` | BSE API key (optional) | `your-bse-key` |
 | `NSE_API_KEY` | NSE API key (optional) | `your-nse-key` |
+| `ENCRYPTION_KEY` | 32-char encryption key | `your-32-char-key` |
+| `JWT_SECRET_KEY` | JWT signing key | `your-jwt-secret` |
 
-#### Gmail App Password Setup
+### Gmail App Password Setup
 1. Enable 2-Factor Authentication on Gmail
 2. Go to https://myaccount.google.com/apppasswords
 3. Generate an App Password for "IPO Reminder"
 4. Use this 16-character password as `SENDER_PASSWORD`
 
-#### Automated Schedule
-The system runs automatically:
-- **Daily at 9:00 AM IST** (3:30 AM UTC)
-- **Manual trigger** available in GitHub Actions
-- **On every push** to main branch (for testing)
-
-### Option 3: Local Development (Optional)
-
-For local development and testing, you can run the system locally:
-
-```bash
-# Set up local database
-python setup_database.py setup
-
-# Create .env file
-cp .env.example .env
-# Edit .env with your email credentials
-
-# Run locally
-python -m ipo_reminder
-```
-
 ---
 
-## ⚙️ **GitHub Actions Automation (Remote Execution)**
+## ⚙️ **GitHub Actions Automation (Primary Execution)**
 
 ### Workflow Features
-- ✅ **Fully Remote Execution**: Runs entirely on GitHub's cloud infrastructure
+- ✅ **Cloud-Only Execution**: Runs entirely on GitHub's infrastructure
 - ✅ **Automated Daily Execution**: Runs at 9:00 AM IST every day
-- ✅ **PostgreSQL Database**: Enterprise-grade database setup in the cloud
-- ✅ **Redis Caching**: High-performance caching layer
+- ✅ **On-Demand Execution**: Manual trigger available anytime
+- ✅ **PostgreSQL Database**: Cloud database service provided by GitHub
+- ✅ **Redis Caching**: High-performance cloud caching
 - ✅ **Multi-source Data**: Fetches from Zerodha, Moneycontrol, Chittorgarh
 - ✅ **Professional Emails**: HTML templates with IPO analysis
 - ✅ **Comprehensive Logging**: All activities logged and stored
@@ -202,10 +172,17 @@ python -m ipo_reminder
 on:
   schedule:
     - cron: '30 3 * * *'  # 9:00 AM IST daily
-  workflow_dispatch:       # Manual trigger
+  workflow_dispatch:       # Manual trigger anytime
   push:
-    branches: [ main ]     # Test on push
+    branches: [ main ]     # Test on code changes
 ```
+
+### Manual Execution
+To run the IPO reminder system manually:
+1. Go to **Actions** tab in your GitHub repository
+2. Click **Enterprise IPO Reminder** workflow
+3. Click **Run workflow** button
+4. The system will execute immediately on GitHub's cloud
 
 ### Monitoring Your Automation
 1. Go to **Actions** tab in your GitHub repository
@@ -215,10 +192,11 @@ on:
 5. Check email delivery status
 
 ### Troubleshooting Automation
-- **Check Secrets**: Ensure all required secrets are set
-- **Verify App Password**: Gmail App Password must be valid
+- **Check Secrets**: Ensure all required secrets are set in repository settings
+- **Verify App Password**: Gmail App Password must be valid and current
 - **Review Logs**: Detailed error logs in workflow runs
 - **Test Manually**: Use workflow dispatch to test immediately
+- **Check Permissions**: Repository must allow GitHub Actions to run
 
 ---
 
@@ -286,44 +264,26 @@ GET /api/v1/monitoring/alerts
 
 ---
 
-## 🔧 **Development**
+## 🔧 **System Management (GitHub-Only)**
 
-### Running Tests
-```bash
-# Run all tests
-pytest
+### Code Updates
+To update the system code:
+1. Make changes directly in the GitHub repository
+2. Commit and push changes to the `main` branch
+3. GitHub Actions will automatically test the changes
+4. Monitor the Actions tab for execution results
 
-# Run with coverage
-pytest --cov=ipo_reminder --cov-report=html
+### Log Access
+- **Execution Logs**: Available in GitHub Actions run history
+- **Artifact Downloads**: Logs saved for 30 days
+- **Real-time Monitoring**: View live execution in Actions tab
+- **Error Notifications**: Check email for any system failures
 
-# Run specific test file
-pytest tests/test_enterprise_orchestrator.py
-```
-
-### Code Quality
-```bash
-# Format code
-black ipo_reminder/
-isort ipo_reminder/
-
-# Lint code
-flake8 ipo_reminder/
-
-# Type checking
-mypy ipo_reminder/
-```
-
-### Database Migrations
-```bash
-# Create new migration
-alembic revision --autogenerate -m "Add new table"
-
-# Run migrations
-alembic upgrade head
-
-# Downgrade
-alembic downgrade -1
-```
+### Configuration Updates
+All configuration is managed through GitHub repository secrets:
+- Update secrets in repository Settings → Secrets and variables → Actions
+- Changes take effect on next workflow execution
+- No local configuration files needed
 
 ---
 
@@ -374,54 +334,27 @@ Access metrics at `/api/v1/metrics` or integrate with:
 
 ---
 
-## 🚀 **Deployment Options**
+## 🚀 **Deployment (GitHub-Only)**
 
-### Docker Deployment
-```dockerfile
-FROM python:3.11-slim
+### GitHub Actions Deployment
+Your system is **fully deployed and running on GitHub**:
 
-WORKDIR /app
-COPY requirements.txt .
-RUN pip install -r requirements.txt
+- **Infrastructure**: GitHub provides all necessary compute, database, and caching
+- **Scaling**: Automatic scaling based on execution demands
+- **Reliability**: 99.9% uptime with GitHub's enterprise-grade infrastructure
+- **Security**: All data encrypted and secured by GitHub
+- **Cost**: Free tier includes unlimited Actions minutes for public repositories
 
-COPY . .
-RUN python setup_database.py setup
+### Execution Schedule
+- **Daily**: Automatic execution at 9:00 AM IST
+- **On-Demand**: Manual execution anytime via workflow dispatch
+- **On-Changes**: Automatic testing on code pushes to main branch
 
-EXPOSE 8000
-CMD ["python", "-m", "ipo_reminder.enterprise_orchestrator"]
-```
-
-### Kubernetes Deployment
-```yaml
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: ipo-reminder
-spec:
-  replicas: 3
-  selector:
-    matchLabels:
-      app: ipo-reminder
-  template:
-    metadata:
-      labels:
-        app: ipo-reminder
-    spec:
-      containers:
-      - name: ipo-reminder
-        image: your-registry/ipo-reminder:latest
-        envFrom:
-        - secretRef:
-            name: ipo-reminder-secrets
-        ports:
-        - containerPort: 8000
-```
-
-### Cloud Deployment
-- **AWS**: ECS, EKS, or Lambda
-- **GCP**: Cloud Run, GKE, or Cloud Functions
-- **Azure**: Container Instances, AKS, or Functions
-- **Heroku**: Standard deployment with add-ons
+### Data Persistence
+- **Database**: PostgreSQL service provided by GitHub Actions
+- **Cache**: Redis service for high-performance caching
+- **Logs**: Comprehensive logging with 30-day retention
+- **Artifacts**: Execution artifacts stored securely
 
 ---
 

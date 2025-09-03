@@ -1,10 +1,24 @@
-name: Enterprise IPO Reminder
+name: Enterprise IPO Reminder (GitHub-Only)
 
 on:
   schedule:
     # Run daily at 9:00 AM IST (3:30 AM UTC)
     - cron: '30 3 * * *'
-  workflow_dispatch:  # Allow manual triggering
+  workflow_dispatch:
+    inputs:
+      execution_mode:
+        description: 'Execution mode'
+        required: false
+        default: 'normal'
+        type: choice
+        options:
+        - normal
+        - test
+        - verbose
+      custom_message:
+        description: 'Custom execution message (optional)'
+        required: false
+        type: string
   push:
     branches: [ main ]
     paths:
@@ -81,12 +95,14 @@ jobs:
         REDIS_URL: redis://localhost:6379/0
         BSE_API_KEY: ${{ secrets.BSE_API_KEY }}
         NSE_API_KEY: ${{ secrets.NSE_API_KEY }}
-        ENCRYPTION_KEY: ${{ secrets.ENCRYPTION_KEY }}
-        JWT_SECRET_KEY: ${{ secrets.JWT_SECRET_KEY }}
+        ENCRYPTION_KEY: default-encryption-key-32-chars-long
+        JWT_SECRET_KEY: default-jwt-secret-key-32-chars-long
         ENTERPRISE_MODE: true
         MONITORING_ENABLED: true
         AUDIT_ENABLED: true
-        LOG_LEVEL: INFO
+        LOG_LEVEL: ${{ github.event.inputs.execution_mode == 'verbose' && 'DEBUG' || 'INFO' }}
+        EXECUTION_MODE: ${{ github.event.inputs.execution_mode || 'normal' }}
+        CUSTOM_MESSAGE: ${{ github.event.inputs.custom_message || '' }}
       run: |
         echo "🚀 ENTERPRISE IPO REMINDER WORKFLOW"
         echo "==================================="
