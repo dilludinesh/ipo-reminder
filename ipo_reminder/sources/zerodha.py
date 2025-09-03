@@ -9,7 +9,7 @@ import requests
 from bs4 import BeautifulSoup
 from dateutil import parser as dateparser
 
-from config import REQUEST_TIMEOUT, USER_AGENT
+from ipo_reminder.config import REQUEST_TIMEOUT, USER_AGENT
 
 logger = logging.getLogger(__name__)
 

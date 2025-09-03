@@ -8,7 +8,7 @@ from typing import Dict, List, Any, Optional
 from concurrent.futures import ThreadPoolExecutor
 import json
 
-from config import (
+from ipo_reminder.config import (
     SENDER_EMAIL, SENDER_PASSWORD, RECIPIENT_EMAIL,
     DATABASE_URL, REDIS_URL, BSE_API_KEY, NSE_API_KEY
 )

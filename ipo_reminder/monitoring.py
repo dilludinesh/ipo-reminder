@@ -9,7 +9,7 @@ import json
 import smtplib
 from email.message import EmailMessage
 
-from config import SENDER_EMAIL, SENDER_PASSWORD, RECIPIENT_EMAIL
+from ipo_reminder.config import SENDER_EMAIL, SENDER_PASSWORD, RECIPIENT_EMAIL
 from database import DatabaseManager, SystemMetrics
 
 logger = logging.getLogger(__name__)

@@ -13,7 +13,7 @@ from dateutil import parser as dateparser
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 
-from config import BASE_URL, REQUEST_TIMEOUT, REQUEST_RETRIES, REQUEST_DELAY, USER_AGENT
+from ipo_reminder.config import BASE_URL, REQUEST_TIMEOUT, REQUEST_RETRIES, REQUEST_DELAY, USER_AGENT
 
 # Configure logging
 logger = logging.getLogger(__name__)

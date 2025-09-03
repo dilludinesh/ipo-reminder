@@ -6,7 +6,7 @@ from datetime import datetime, date
 from typing import List, Optional, Dict, Any
 from bs4 import BeautifulSoup
 
-from config import REQUEST_TIMEOUT, USER_AGENT
+from ipo_reminder.config import REQUEST_TIMEOUT, USER_AGENT
 from .chittorgarh import IPOInfo, _clean_text, _parse_date
 
 logger = logging.getLogger(__name__)

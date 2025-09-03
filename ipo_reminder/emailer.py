@@ -9,7 +9,7 @@ from email.message import EmailMessage
 from typing import List, Optional
 from email.utils import formataddr
 
-from config import SENDER_EMAIL, SENDER_PASSWORD, RECIPIENT_EMAIL, validate_email_config
+from ipo_reminder.config import SENDER_EMAIL, SENDER_PASSWORD, RECIPIENT_EMAIL, validate_email_config
 
 logger = logging.getLogger(__name__)
 

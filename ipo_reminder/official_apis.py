@@ -27,16 +27,16 @@ from tenacity import (
     RetryCallState
 )
 
-from database import DatabaseManager, IPOData, AuditLog
-from cache import cache_manager, cache_ipo_data
-from config import (
+from ipo_reminder.database import DatabaseManager, IPOData, AuditLog
+from ipo_reminder.cache import cache_manager, cache_ipo_data
+from ipo_reminder.config import (
     BSE_API_KEY, BSE_API_BASE_URL, BSE_API_TIMEOUT,
     NSE_API_KEY, NSE_API_BASE_URL, NSE_API_TIMEOUT,
     CIRCUIT_BREAKER_FAILURE_THRESHOLD, CIRCUIT_BREAKER_RECOVERY_TIMEOUT,
     CIRCUIT_BREAKER_HALF_OPEN_MAX_REQUESTS, MAX_CONCURRENT_API_REQUESTS,
     BSE_API_RATE_LIMIT, NSE_API_RATE_LIMIT
 )
-from rate_limiting import (
+from ipo_reminder.rate_limiting import (
     RateLimiter, CircuitBreaker, RateLimitExceeded, CircuitOpenError, Bulkhead,
     RateLimitConfig, CircuitBreakerConfig
 )
@@ -199,6 +199,23 @@ class BSEAPIClient:
             method: HTTP method (GET, POST, etc.)
             endpoint: API endpoint
             **kwargs: Additional arguments for aiohttp request
+        """
+        if not self.session:
+            await self.initialize()
+            
+        url = f"{self.base_url.rstrip('/')}/{endpoint.lstrip('/')}"
+        
+        try:
+            async with self.rate_limiter.throttle():
+                async with self.bulkhead.semaphore:
+                    async with self.session.request(
+                        method, url, headers=self.headers, 
+                        timeout=self.timeout, **kwargs
+                    ) as response:
+                        response.raise_for_status()
+                        return await response.json()
+                        
+        except Exception as e:
             logger.error(
                 f"Request to {url} failed: {str(e)}",
                 extra={'url': url, 'error': str(e)},
@@ -255,7 +272,6 @@ class BSEAPIClient:
             except Exception as e:
                 logger.warning(f"Failed to cache BSE IPO data: {e}")
             
-
             self.record_success()
             logger.info(f"Successfully fetched {len(ipos)} IPOs from BSE API")
             return ipos
@@ -275,14 +291,14 @@ class BSEAPIClient:
         """Parse issue size string into float (in crores)."""
         if not size_str:
             return None
-            
+
         try:
             # Handle formats like "1,234.56" or "1,234.56 Cr"
             size_str = size_str.lower().replace('cr', '').replace(',', '').strip()
             return float(size_str) if size_str else None
         except (ValueError, TypeError):
             return None
-    
+
     def _parse_date(self, date_str: str) -> Optional[date]:
         """Parse date string from NSE API."""
         if not date_str:

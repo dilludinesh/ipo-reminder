@@ -1,81 +1,85 @@
-"""Database configuration and models for enterprise-grade IPO system."""
+"""Database configuration and models for enterprise-grade IPO system with async support."""
 import os
 import logging
 from datetime import datetime, date
-from typing import List, Optional, Dict, Any
-from sqlalchemy import create_engine, Column, Integer, String, Date, DateTime, Text, Float, Boolean, JSON, ForeignKey
-from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import sessionmaker, Session, relationship
-from sqlalchemy.pool import QueuePool
+from typing import List, Optional, Dict, Any, AsyncGenerator
+from sqlalchemy import Column, Integer, String, Date, DateTime, Text, Float, Boolean, JSON, ForeignKey
+from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
+from sqlalchemy.orm import declarative_base, relationship, sessionmaker
 from sqlalchemy.exc import SQLAlchemyError
-from contextlib import contextmanager
+from contextlib import asynccontextmanager
 
 logger = logging.getLogger(__name__)
 
 # Database Configuration
-DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///ipo_reminder.db")
+DATABASE_URL = os.getenv("DATABASE_URL", "sqlite+aiosqlite:///ipo_reminder.db")
 REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0")
 
-# Create engine with connection pooling
-engine = create_engine(
+# Create async engine with SQLite-compatible configuration
+engine = create_async_engine(
     DATABASE_URL,
-    poolclass=QueuePool,
-    pool_size=10,
-    max_overflow=20,
-    pool_timeout=30,
-    pool_recycle=3600,
-    echo=bool(os.getenv("SQL_ECHO", False))
+    echo=bool(os.getenv("SQL_ECHO", False)),
+    # SQLite in-memory database requires special handling
+    connect_args={"check_same_thread": False} if DATABASE_URL.startswith("sqlite") else {}
 )
 
-SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+# Create async session factory
+async_session_factory = async_sessionmaker(
+    bind=engine,
+    class_=AsyncSession,
+    expire_on_commit=False,
+    autoflush=False,
+    autocommit=False
+)
+
 Base = declarative_base()
 
 class DatabaseManager:
-    """Database connection manager with proper error handling."""
+    """Database connection manager with proper async error handling."""
 
     def __init__(self):
         """Initialize the database manager."""
-        pass
+        self.engine = engine
+        self.async_session_factory = async_session_factory
 
-    @staticmethod
-    @contextmanager
-    def get_session():
-        """Get a database session with proper error handling."""
-        session = SessionLocal()
+    @asynccontextmanager
+    async def get_session(self) -> AsyncGenerator[AsyncSession, None]:
+        """Get an async database session with proper error handling."""
+        session = self.async_session_factory()
         try:
             yield session
-            session.commit()
-        except Exception as e:
-            session.rollback()
-            logger.error(f"Database session error: {e}")
+            await session.commit()
+        except SQLAlchemyError as e:
+            await session.rollback()
+            logger.error(f"Database error: {e}")
             raise
         finally:
-            session.close()
+            await session.close()
 
     async def initialize(self):
-        """Async initialize database tables."""
-        try:
-            Base.metadata.create_all(bind=engine)
-            logger.info("Database tables initialized successfully")
-        except Exception as e:
-            logger.error(f"Failed to initialize database: {e}")
-            raise
+        """Initialize database tables."""
+        async with self.engine.begin() as conn:
+            await conn.run_sync(Base.metadata.create_all)
+        logger.info("Database tables initialized")
 
     async def shutdown(self):
         """Shutdown database connections."""
-        try:
-            engine.dispose()
-            logger.info("Database connections closed")
-        except Exception as e:
-            logger.error(f"Error closing database connections: {e}")
+        await self.engine.dispose()
+        logger.info("Database connections closed")
 
     async def get_stats(self) -> Dict[str, Any]:
         """Get database statistics."""
-        return {
-            'engine': str(engine),
-            'pool_size': engine.pool.size() if hasattr(engine.pool, 'size') else 0,
-            'checked_out': engine.pool.checkedout() if hasattr(engine.pool, 'checkedout') else 0
-        }
+        async with self.get_session() as session:
+            # Get connection pool status
+            pool = self.engine.pool
+            stats = {
+                "connection_count": pool.checkedin(),
+                "pool_size": pool.size(),
+                "pool_overflow": pool.overflow(),
+                "pool_timeout": pool.timeout(),
+                "checked_out": pool.checkedout() if hasattr(pool, 'checkedout') else 0
+            }
+            return stats
 
 # Database Models
 class IPOData(Base):
@@ -223,9 +227,11 @@ class CircuitBreakerState(Base):
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
 # Initialize database on import
-def init_db():
-    """Initialize database tables."""
-    DatabaseManager.init_database()
+async def init_db():
+    """Initialize database tables asynchronously."""
+    db_manager = DatabaseManager()
+    await db_manager.initialize()
 
 if __name__ == "__main__":
-    init_db()
+    import asyncio
+    asyncio.run(init_db())
