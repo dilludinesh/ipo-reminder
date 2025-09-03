@@ -307,7 +307,8 @@ class ComplianceLogger:
                 if resource:
                     query = query.filter(AuditLog.resource.like(f"%{resource}%"))
                 if event_type:
-                    query = query.filter(AuditLog.event_type == event_type.value)
+                    # Filter by event_type stored in context_data JSON field
+                    query = query.filter(AuditLog.context_data['event_type'].astext == event_type.value)
                 if start_date:
                     query = query.filter(AuditLog.timestamp >= start_date)
                 if end_date:

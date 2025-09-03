@@ -47,11 +47,6 @@ def setup_database():
                 ON audit_logs (timestamp);
             """))
 
-            conn.execute(text("""
-                CREATE INDEX IF NOT EXISTS idx_audit_logs_event_type
-                ON audit_logs (event_type);
-            """))
-
             # Index for system metrics
             conn.execute(text("""
                 CREATE INDEX IF NOT EXISTS idx_system_metrics_timestamp
