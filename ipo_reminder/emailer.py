@@ -9,7 +9,7 @@ from email.message import EmailMessage
 from typing import List, Optional
 from email.utils import formataddr
 
-from .config import SENDER_EMAIL, SENDER_PASSWORD, RECIPIENT_EMAIL, validate_email_config
+from config import SENDER_EMAIL, SENDER_PASSWORD, RECIPIENT_EMAIL, validate_email_config
 
 logger = logging.getLogger(__name__)
 
@@ -163,3 +163,42 @@ def send_email(
         logger.error(f"SMTP send failed: {e}")
         _append_email_log("SMTP_FAILED", valid_recipients[0], subject, str(e))
         return False
+
+
+class Emailer:
+    """Email service class for sending IPO reminder emails."""
+
+    def __init__(self):
+        """Initialize the emailer."""
+        pass
+
+    async def send_email(
+        self,
+        subject: str,
+        html_content: str,
+        recipient_email: Optional[str] = None,
+        sender_name: str = "IPO Reminder Service"
+    ) -> bool:
+        """
+        Send an email asynchronously.
+
+        Args:
+            subject: Email subject
+            html_content: HTML content of the email
+            recipient_email: Recipient email address (optional, uses config default)
+            sender_name: Sender name (default: IPO Reminder Service)
+
+        Returns:
+            bool: True if email sent successfully, False otherwise
+        """
+        try:
+            # Call the existing send_email function
+            return send_email(
+                subject=subject,
+                html_content=html_content,
+                recipient_email=recipient_email,
+                sender_name=sender_name
+            )
+        except Exception as e:
+            logger.error(f"Emailer.send_email failed: {e}")
+            return False

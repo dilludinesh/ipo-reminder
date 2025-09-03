@@ -9,9 +9,9 @@ import aiohttp
 import requests
 from circuitbreaker import circuit
 
-from ..database import DatabaseManager, IPOData, AuditLog
-from ..cache import cache_manager, cache_ipo_data
-from ..config import REQUEST_TIMEOUT
+from database import DatabaseManager, IPOData, AuditLog
+from cache import cache_manager, cache_ipo_data
+from config import REQUEST_TIMEOUT
 
 logger = logging.getLogger(__name__)
 
@@ -86,8 +86,29 @@ class BSEAPIClient(CircuitBreakerMixin):
             'Content-Type': 'application/json'
         })
 
+    async def initialize(self):
+        """Initialize the BSE API client."""
+        logger.info("BSE API client initialized")
+
+    async def shutdown(self):
+        """Shutdown the BSE API client."""
+        try:
+            if self.session:
+                self.session.close()
+            logger.info("BSE API client shutdown")
+        except Exception as e:
+            logger.error(f"Error shutting down BSE API client: {e}")
+
+    async def get_status(self) -> Dict[str, Any]:
+        """Get client status."""
+        return {
+            'service': 'BSE_API',
+            'state': self.state,
+            'failure_count': self.failure_count
+        }
+
     @circuit(failure_threshold=5, recovery_timeout=300, expected_exception=Exception)
-    def get_ipo_data(self, target_date: date) -> List[OfficialIPOData]:
+    async def get_ipo_data(self, target_date: date) -> List[OfficialIPOData]:
         """Get IPO data from BSE with circuit breaker protection."""
         if not self.can_execute():
             logger.warning("BSE API circuit breaker is OPEN, skipping request")
@@ -102,11 +123,14 @@ class BSEAPIClient(CircuitBreakerMixin):
                 'date': target_date.strftime('%Y-%m-%d')
             }
 
-            response = self.session.get(url, params=params, timeout=REQUEST_TIMEOUT)
-            response.raise_for_status()
+            # Use aiohttp for async requests
+            async with aiohttp.ClientSession() as session:
+                async with session.get(url, params=params, timeout=REQUEST_TIMEOUT) as response:
+                    response.raise_for_status()
+                    data = await response.json()
 
             # Parse BSE response (simplified - actual implementation would parse real API response)
-            ipos = self._parse_bse_response(response.json() if response.headers.get('content-type', '').startswith('application/json') else {})
+            ipos = self._parse_bse_response(data)
 
             self.record_success()
             logger.info(f"Successfully fetched {len(ipos)} IPOs from BSE API")
@@ -140,8 +164,29 @@ class NSEAPIClient(CircuitBreakerMixin):
             'Connection': 'keep-alive'
         })
 
+    async def initialize(self):
+        """Initialize the NSE API client."""
+        logger.info("NSE API client initialized")
+
+    async def shutdown(self):
+        """Shutdown the NSE API client."""
+        try:
+            if self.session:
+                self.session.close()
+            logger.info("NSE API client shutdown")
+        except Exception as e:
+            logger.error(f"Error shutting down NSE API client: {e}")
+
+    async def get_status(self) -> Dict[str, Any]:
+        """Get client status."""
+        return {
+            'service': 'NSE_API',
+            'state': self.state,
+            'failure_count': self.failure_count
+        }
+
     @circuit(failure_threshold=5, recovery_timeout=300, expected_exception=Exception)
-    def get_ipo_data(self, target_date: date) -> List[OfficialIPOData]:
+    async def get_ipo_data(self, target_date: date) -> List[OfficialIPOData]:
         """Get IPO data from NSE with circuit breaker protection."""
         if not self.can_execute():
             logger.warning("NSE API circuit breaker is OPEN, skipping request")
@@ -151,10 +196,13 @@ class NSEAPIClient(CircuitBreakerMixin):
             # NSE IPO endpoint
             url = f"{self.base_url}/ipo-master"
 
-            response = self.session.get(url, timeout=REQUEST_TIMEOUT)
-            response.raise_for_status()
+            # Use aiohttp for async requests
+            async with aiohttp.ClientSession(headers=self.session.headers) as session:
+                async with session.get(url, timeout=REQUEST_TIMEOUT) as response:
+                    response.raise_for_status()
+                    data = await response.json()
 
-            ipos = self._parse_nse_response(response.json())
+            ipos = self._parse_nse_response(data)
 
             # Filter for target date
             closing_today = [ipo for ipo in ipos if ipo.close_date == target_date]
@@ -269,9 +317,22 @@ class OfficialAPIManager:
 
     async def get_official_ipos_async(self, target_date: date) -> List[OfficialIPOData]:
         """Async version for better performance."""
-        # This would implement async HTTP requests for better performance
-        # For now, delegate to sync version
-        return self.get_official_ipos(target_date)
+        all_ipos = []
+
+        # Try NSE first (more reliable)
+        nse_ipos = await self.nse_client.get_ipo_data(target_date)
+        all_ipos.extend(nse_ipos)
+
+        # Try BSE as backup
+        if not all_ipos or len(all_ipos) < 2:  # If NSE fails or returns few results
+            bse_ipos = await self.bse_client.get_ipo_data(target_date)
+            all_ipos.extend(bse_ipos)
+
+        # Remove duplicates based on company name
+        unique_ipos = self._remove_duplicates(all_ipos)
+
+        logger.info(f"Retrieved {len(unique_ipos)} unique IPOs from official APIs")
+        return unique_ipos
 
 # Global instance
 official_api_manager = OfficialAPIManager()

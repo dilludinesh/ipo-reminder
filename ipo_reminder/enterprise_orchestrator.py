@@ -3,28 +3,28 @@ import logging
 import asyncio
 import signal
 import sys
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, date
 from typing import Dict, List, Any, Optional
 from concurrent.futures import ThreadPoolExecutor
 import json
 
-from .config import (
+from config import (
     SENDER_EMAIL, SENDER_PASSWORD, RECIPIENT_EMAIL,
     DATABASE_URL, REDIS_URL, BSE_API_KEY, NSE_API_KEY
 )
-from .database import DatabaseManager, IPOData, IPORecommendation
-from .cache import CacheManager
-from .official_apis import BSEAPIClient, NSEAPIClient
-from .monitoring import monitoring_system, record_metric, increment_counter
-from .compliance import compliance_logger, log_system_startup, log_system_shutdown
-from .emailer import Emailer
-from .ipo_categorizer import IPOCategorizer
-from .investment_advisor import InvestmentAdvisor
-from .deep_analyzer import DeepAnalyzer
-from .sources.zerodha import ZerodhaScraper
-from .sources.moneycontrol import MoneycontrolScraper
-from .sources.chittorgarh import ChittorgarhScraper
-from .sources.fallback import FallbackScraper
+from database import DatabaseManager, IPOData, IPORecommendation
+from cache import CacheManager
+from official_apis import BSEAPIClient, NSEAPIClient
+from monitoring import monitoring_system, record_metric, increment_counter
+from compliance import compliance_logger, log_system_startup, log_system_shutdown
+from emailer import Emailer
+from ipo_categorizer import IPOCategorizer
+from investment_advisor import InvestmentAdvisor
+from deep_analyzer import DeepIPOAnalyzer
+from sources.zerodha import ZerodhaScraper
+from sources.moneycontrol import MoneycontrolScraper
+from sources.chittorgarh import ChittorgarhScraper
+from sources.fallback import FallbackScraper
 
 logger = logging.getLogger(__name__)
 
@@ -34,12 +34,12 @@ class EnterpriseIPOOrchestrator:
     def __init__(self):
         self.db_manager = DatabaseManager()
         self.cache_manager = CacheManager()
-        self.bse_client = BSEAPIClient(api_key=BSE_API_KEY)
-        self.nse_client = NSEAPIClient(api_key=NSE_API_KEY)
+        self.bse_client = BSEAPIClient()
+        self.nse_client = NSEAPIClient()
         self.emailer = Emailer()
         self.categorizer = IPOCategorizer()
         self.advisor = InvestmentAdvisor()
-        self.analyzer = DeepAnalyzer()
+        self.analyzer = DeepIPOAnalyzer()
 
         # Scrapers for fallback
         self.scrapers = {
@@ -121,6 +121,7 @@ class EnterpriseIPOOrchestrator:
         """Fetch IPO data using enterprise-grade approach."""
         start_time = datetime.utcnow()
         record_metric('ipo_fetch_start', 1.0)
+        target_date = date.today()  # Today's date for IPO closing
 
         try:
             # Try official APIs first
@@ -128,7 +129,7 @@ class EnterpriseIPOOrchestrator:
 
             # Fetch from BSE
             try:
-                bse_data = await self.bse_client.get_upcoming_ipos()
+                bse_data = await self.bse_client.get_ipo_data(target_date)
                 ipo_data.extend(bse_data)
                 record_metric('bse_api_calls', 1.0, {'status': 'success'})
                 compliance_logger.log_api_call('bse', 'upcoming_ipos', 'SUCCESS',
@@ -141,7 +142,7 @@ class EnterpriseIPOOrchestrator:
 
             # Fetch from NSE
             try:
-                nse_data = await self.nse_client.get_upcoming_ipos()
+                nse_data = await self.nse_client.get_ipo_data(target_date)
                 ipo_data.extend(nse_data)
                 record_metric('nse_api_calls', 1.0, {'status': 'success'})
                 compliance_logger.log_api_call('nse', 'upcoming_ipos', 'SUCCESS',
@@ -161,7 +162,7 @@ class EnterpriseIPOOrchestrator:
             ipo_data = self._deduplicate_and_validate(ipo_data)
 
             # Cache the results
-            await self.cache_manager.set('latest_ipo_data', ipo_data, ttl=3600)  # 1 hour
+            await self.cache_manager.set('latest_ipo_data', ipo_data, ttl_seconds=3600)  # 1 hour
 
             # Store in database
             await self._store_ipo_data(ipo_data)
@@ -188,6 +189,8 @@ class EnterpriseIPOOrchestrator:
 
     async def _fetch_via_scraping(self) -> List[Dict[str, Any]]:
         """Fallback to web scraping if official APIs fail."""
+        from datetime import date
+        target_date = date.today()
         ipo_data = []
 
         # Try scrapers in order of preference
@@ -196,12 +199,29 @@ class EnterpriseIPOOrchestrator:
                 data = await asyncio.get_event_loop().run_in_executor(
                     self.executor, scraper.get_upcoming_ipos
                 )
-                ipo_data.extend(data)
-                record_metric('scraper_calls', 1.0, {'scraper': name, 'status': 'success'})
+                
+                # Filter IPOs closing today
+                closing_today = []
+                for ipo in data:
+                    close_date_str = ipo.get('ipo_close_date')
+                    if close_date_str:
+                        try:
+                            from datetime import datetime
+                            close_date = datetime.fromisoformat(close_date_str.replace('Z', '+00:00')).date()
+                            if close_date == target_date:
+                                closing_today.append(ipo)
+                        except (ValueError, AttributeError):
+                            continue
+                
+                ipo_data.extend(closing_today)
+                record_metric('scraper_calls', 1.0, {'scraper': name, 'status': 'success', 'closing_today': len(closing_today)})
+                logger.info(f"Scraper {name} found {len(closing_today)} IPOs closing today")
+                
             except Exception as e:
                 logger.warning(f"Scraper {name} failed: {e}")
                 record_metric('scraper_calls', 1.0, {'scraper': name, 'status': 'failure', 'error': str(e)})
 
+        logger.info(f"Web scraping found {len(ipo_data)} total IPOs closing today")
         return ipo_data
 
     def _deduplicate_and_validate(self, ipo_data: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
@@ -221,22 +241,50 @@ class EnterpriseIPOOrchestrator:
 
     def _validate_ipo_data(self, ipo: Dict[str, Any]) -> bool:
         """Validate IPO data structure."""
-        required_fields = ['company_name', 'ipo_open_date', 'ipo_close_date']
+        # Required fields - make ipo_open_date optional since many sources don't provide it
+        required_fields = ['company_name', 'ipo_close_date']
 
         for field in required_fields:
             if not ipo.get(field):
                 return False
 
-        # Validate dates
+        # Validate close date format
         try:
-            open_date = datetime.fromisoformat(ipo['ipo_open_date'].replace('Z', '+00:00'))
-            close_date = datetime.fromisoformat(ipo['ipo_close_date'].replace('Z', '+00:00'))
-
-            if close_date <= open_date:
+            close_date_str = ipo['ipo_close_date']
+            if isinstance(close_date_str, str):
+                datetime.fromisoformat(close_date_str.replace('Z', '+00:00'))
+            elif hasattr(close_date_str, 'isoformat'):  # date/datetime object
+                pass  # Already valid
+            else:
                 return False
-
         except (ValueError, AttributeError):
             return False
+
+        # If open date is provided, validate it
+        if ipo.get('ipo_open_date'):
+            try:
+                open_date_str = ipo['ipo_open_date']
+                if isinstance(open_date_str, str):
+                    open_date = datetime.fromisoformat(open_date_str.replace('Z', '+00:00'))
+                elif hasattr(open_date_str, 'isoformat'):  # date/datetime object
+                    open_date = open_date_str if hasattr(open_date_str, 'date') else open_date_str
+                else:
+                    return False
+                
+                # If both dates are available, ensure close date is after open date
+                if ipo.get('ipo_close_date'):
+                    close_date_str = ipo['ipo_close_date']
+                    if isinstance(close_date_str, str):
+                        close_date = datetime.fromisoformat(close_date_str.replace('Z', '+00:00'))
+                    else:
+                        close_date = close_date_str
+                    
+                    if isinstance(close_date, datetime) and isinstance(open_date, datetime):
+                        if close_date <= open_date:
+                            return False
+                            
+            except (ValueError, AttributeError):
+                return False
 
         return True
 
@@ -248,19 +296,27 @@ class EnterpriseIPOOrchestrator:
                     # Check if already exists
                     existing = session.query(IPOData).filter_by(
                         company_name=ipo['company_name'],
-                        ipo_open_date=datetime.fromisoformat(ipo['ipo_open_date'].replace('Z', '+00:00'))
+                        close_date=datetime.fromisoformat(ipo['ipo_close_date'].replace('Z', '+00:00'))
                     ).first()
 
                     if not existing:
+                        # Handle optional open date
+                        open_date = None
+                        if ipo.get('ipo_open_date'):
+                            try:
+                                open_date = datetime.fromisoformat(ipo['ipo_open_date'].replace('Z', '+00:00'))
+                            except (ValueError, AttributeError):
+                                open_date = None
+
                         db_ipo = IPOData(
                             company_name=ipo['company_name'],
-                            ipo_open_date=datetime.fromisoformat(ipo['ipo_open_date'].replace('Z', '+00:00')),
-                            ipo_close_date=datetime.fromisoformat(ipo['ipo_close_date'].replace('Z', '+00:00')),
-                            price_range=ipo.get('price_range'),
+                            open_date=open_date,
+                            close_date=datetime.fromisoformat(ipo['ipo_close_date'].replace('Z', '+00:00')),
+                            price_band=ipo.get('price_range'),
                             lot_size=ipo.get('lot_size'),
                             platform=ipo.get('platform', 'Unknown'),
                             sector=ipo.get('sector'),
-                            raw_data=json.dumps(ipo)
+                            source=ipo.get('source', 'enterprise')
                         )
                         session.add(db_ipo)
 
@@ -288,7 +344,7 @@ class EnterpriseIPOOrchestrator:
                 analysis = await self._perform_comprehensive_analysis(ipo)
 
                 # Cache the analysis
-                await self.cache_manager.set(cache_key, analysis, ttl=1800)  # 30 minutes
+                await self.cache_manager.set(cache_key, analysis, ttl_seconds=1800)  # 30 minutes
 
                 analyzed_ipos.append(analysis)
 

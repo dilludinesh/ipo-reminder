@@ -11,7 +11,7 @@ import requests
 from bs4 import BeautifulSoup
 from dateutil import parser as dateparser
 
-from ..config import REQUEST_TIMEOUT, USER_AGENT
+from config import REQUEST_TIMEOUT, USER_AGENT
 from .chittorgarh import IPOInfo
 
 logger = logging.getLogger(__name__)

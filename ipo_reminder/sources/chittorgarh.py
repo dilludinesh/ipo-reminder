@@ -13,7 +13,7 @@ from dateutil import parser as dateparser
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 
-from ..config import BASE_URL, REQUEST_TIMEOUT, REQUEST_RETRIES, REQUEST_DELAY, USER_AGENT
+from config import BASE_URL, REQUEST_TIMEOUT, REQUEST_RETRIES, REQUEST_DELAY, USER_AGENT
 
 # Configure logging
 logger = logging.getLogger(__name__)
@@ -495,3 +495,30 @@ Market is quiet today.
     
     body = "\n".join(lines)
     return subject, body
+
+
+class ChittorgarhScraper:
+    """Scraper for Chittorgarh IPO data."""
+
+    def get_upcoming_ipos(self) -> List[Dict[str, Any]]:
+        """Get upcoming IPOs from Chittorgarh."""
+        try:
+            chittorgarh_ipos = get_upcoming_ipos()
+            ipo_data = []
+
+            for ipo in chittorgarh_ipos:
+                ipo_dict = {
+                    'company_name': ipo.name,
+                    'ipo_open_date': ipo.open_date.isoformat() if ipo.open_date else None,
+                    'ipo_close_date': ipo.close_date.isoformat() if ipo.close_date else None,
+                    'price_range': ipo.price_band,
+                    'lot_size': ipo.lot_size,
+                    'platform': 'Mainboard',  # Default, could be enhanced
+                    'source': 'chittorgarh'
+                }
+                ipo_data.append(ipo_dict)
+
+            return ipo_data
+        except Exception as e:
+            logger.error(f"ChittorgarhScraper error: {e}")
+            return []

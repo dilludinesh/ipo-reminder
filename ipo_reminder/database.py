@@ -33,34 +33,49 @@ Base = declarative_base()
 class DatabaseManager:
     """Database connection manager with proper error handling."""
 
+    def __init__(self):
+        """Initialize the database manager."""
+        pass
+
     @staticmethod
     @contextmanager
     def get_session():
-        """Get database session with automatic cleanup."""
+        """Get a database session with proper error handling."""
         session = SessionLocal()
         try:
             yield session
             session.commit()
-        except SQLAlchemyError as e:
-            session.rollback()
-            logger.error(f"Database error: {e}")
-            raise
         except Exception as e:
             session.rollback()
-            logger.error(f"Unexpected database error: {e}")
+            logger.error(f"Database session error: {e}")
             raise
         finally:
             session.close()
 
-    @staticmethod
-    def init_database():
-        """Initialize database tables."""
+    async def initialize(self):
+        """Async initialize database tables."""
         try:
             Base.metadata.create_all(bind=engine)
             logger.info("Database tables initialized successfully")
         except Exception as e:
             logger.error(f"Failed to initialize database: {e}")
             raise
+
+    async def shutdown(self):
+        """Shutdown database connections."""
+        try:
+            engine.dispose()
+            logger.info("Database connections closed")
+        except Exception as e:
+            logger.error(f"Error closing database connections: {e}")
+
+    async def get_stats(self) -> Dict[str, Any]:
+        """Get database statistics."""
+        return {
+            'engine': str(engine),
+            'pool_size': engine.pool.size() if hasattr(engine.pool, 'size') else 0,
+            'checked_out': engine.pool.checkedout() if hasattr(engine.pool, 'checkedout') else 0
+        }
 
 # Database Models
 class IPOData(Base):
@@ -145,7 +160,7 @@ class AuditLog(Base):
     # Action details
     old_values = Column(JSON)  # Previous state for updates
     new_values = Column(JSON)  # New state
-    metadata = Column(JSON)  # Additional context
+    context_data = Column(JSON)  # Additional context (renamed from metadata)
 
     # Compliance fields
     timestamp = Column(DateTime, default=datetime.utcnow, nullable=False)

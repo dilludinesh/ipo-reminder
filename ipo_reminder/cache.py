@@ -32,6 +32,28 @@ class CacheManager:
             logger.warning(f"Redis connection failed, using memory cache: {e}")
             self.redis_client = None
 
+    async def initialize(self):
+        """Initialize the cache manager."""
+        # Already initialized in __init__, but this satisfies the interface
+        logger.info("Cache manager initialized")
+
+    async def shutdown(self):
+        """Shutdown the cache manager."""
+        try:
+            if self.redis_client:
+                self.redis_client.close()
+            logger.info("Cache manager shutdown complete")
+        except Exception as e:
+            logger.error(f"Error shutting down cache manager: {e}")
+
+    async def get_stats(self) -> Dict[str, Any]:
+        """Get cache statistics."""
+        return {
+            'redis_connected': self.redis_client is not None,
+            'memory_cache_size': len(self.memory_cache),
+            'stats': self.cache_stats.copy()
+        }
+
     def _get_cache_key(self, key: str, namespace: str = "") -> str:
         """Generate consistent cache key with optional namespace."""
         if namespace:
@@ -87,7 +109,7 @@ class CacheManager:
             logger.error(f"Cache get error for key {key}: {e}")
             return None
 
-    def set(self, key: str, value: Any, ttl_seconds: int = 3600, namespace: str = "") -> bool:
+    async def set(self, key: str, value: Any, ttl_seconds: int = 3600, namespace: str = "") -> bool:
         """Set value in cache with TTL."""
         cache_key = self._get_cache_key(key, namespace)
         expires_at = datetime.now() + timedelta(seconds=ttl_seconds)

@@ -8,7 +8,7 @@ from dataclasses import dataclass, asdict
 from enum import Enum
 import uuid
 
-from ..database import DatabaseManager, AuditLog
+from database import DatabaseManager, AuditLog
 
 logger = logging.getLogger(__name__)
 
@@ -101,19 +101,24 @@ class ComplianceLogger:
             # Persist to database
             with DatabaseManager.get_session() as session:
                 db_log = AuditLog(
-                    event_id=event.event_id,
-                    event_type=event.event_type.value,
-                    timestamp=event.timestamp,
+                    action=f"{event.event_type.value}:{event.action}",
                     user_id=event.user_id,
-                    session_id=event.session_id,
-                    resource=event.resource,
-                    action=event.action,
-                    status=event.status,
-                    details=json.dumps(event.details),
-                    compliance_level=event.compliance_level.value,
                     ip_address=event.ip_address,
                     user_agent=event.user_agent,
-                    checksum=event.checksum
+                    context_data={
+                        'event_id': event.event_id,
+                        'event_type': event.event_type.value,
+                        'status': event.status,
+                        'details': event.details,
+                        'compliance_level': event.compliance_level.value,
+                        'checksum': event.checksum
+                    },
+                    timestamp=event.timestamp,
+                    session_id=event.session_id,
+                    compliance_flags={
+                        'level': event.compliance_level.value,
+                        'resource': event.resource
+                    }
                 )
                 session.add(db_log)
 
@@ -397,6 +402,10 @@ def log_event(event: AuditEvent):
 def log_system_startup(details: Dict[str, Any] = None):
     """Log system startup."""
     compliance_logger.log_system_startup(details)
+
+def log_system_shutdown(details: Dict[str, Any] = None):
+    """Log system shutdown."""
+    compliance_logger.log_system_shutdown(details)
 
 def log_ipo_data_fetch(source: str, count: int, status: str, details: Dict[str, Any] = None):
     """Log IPO data fetch."""

@@ -33,17 +33,6 @@ prometheus-client>=0.17.0
 # Circuit Breaker
 circuitbreaker>=2.0.0
 
-# Official API clients
-bse-python>=1.0.0
-nsepython>=1.0.0
-
-# Development and testing
-pytest>=7.4.0
-pytest-cov>=4.1.0
-black>=23.0.0
-flake8>=6.0.0
-pytest-asyncio>=0.21.0
-
 # Async support
 aiohttp>=3.8.0
 asyncio>=3.4.3

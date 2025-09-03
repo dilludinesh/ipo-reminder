@@ -7,7 +7,7 @@ import re
 from typing import List, Tuple, Dict
 from dataclasses import dataclass
 
-from .utils import sanitize_input, validate_price_band, calculate_risk_score, generate_investment_thesis
+from utils import sanitize_input, validate_price_band, calculate_risk_score, generate_investment_thesis
 
 logger = logging.getLogger(__name__)
 
@@ -186,8 +186,8 @@ def format_personal_guide_email(now_date, ipos: List) -> Tuple[str, str, str]:
 
 def format_ipo_email_html(today_date, ipos: List) -> Tuple[str, str, str]:
     """Formats a professional HTML email with enhanced IPO recommendations."""
-    from .deep_analyzer import DeepIPOAnalyzer
-    from .utils import create_email_summary, generate_investment_thesis
+    from deep_analyzer import DeepIPOAnalyzer
+    from utils import create_email_summary, generate_investment_thesis
 
     formatted_date = today_date.strftime("%d %b %Y")
     subject = f"IPO Reminder • {formatted_date}"

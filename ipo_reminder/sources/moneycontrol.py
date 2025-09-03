@@ -2,13 +2,13 @@
 import logging
 import re
 from datetime import datetime, date
-from typing import List, Optional
+from typing import List, Optional, Dict, Any
 
 import requests
 from bs4 import BeautifulSoup
 from dateutil import parser as dateparser
 
-from ..config import REQUEST_TIMEOUT, USER_AGENT
+from config import REQUEST_TIMEOUT, USER_AGENT
 from .chittorgarh import IPOInfo
 
 logger = logging.getLogger(__name__)
@@ -267,3 +267,32 @@ def _remove_duplicates(ipos: List[IPOInfo]) -> List[IPOInfo]:
             unique_ipos.append(ipo)
     
     return unique_ipos
+
+
+class MoneycontrolScraper:
+    """Scraper for Moneycontrol IPO data."""
+
+    def get_upcoming_ipos(self) -> List[Dict[str, Any]]:
+        """Get upcoming IPOs from Moneycontrol."""
+        try:
+            from datetime import date as date_type
+            today = date_type.today()
+            moneycontrol_ipos = get_moneycontrol_ipos(today)
+            ipo_data = []
+
+            for ipo in moneycontrol_ipos:
+                ipo_dict = {
+                    'company_name': ipo.name,
+                    'ipo_open_date': ipo.open_date.isoformat() if ipo.open_date else None,
+                    'ipo_close_date': ipo.close_date.isoformat() if ipo.close_date else None,
+                    'price_range': ipo.price_band,
+                    'lot_size': ipo.lot_size,
+                    'platform': 'Mainboard',  # Default, could be enhanced
+                    'source': 'moneycontrol'
+                }
+                ipo_data.append(ipo_dict)
+
+            return ipo_data
+        except Exception as e:
+            logger.error(f"MoneycontrolScraper error: {e}")
+            return []

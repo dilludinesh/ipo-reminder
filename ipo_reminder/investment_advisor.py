@@ -206,3 +206,82 @@ Market is quiet - good time to research upcoming opportunities.
     
     body = "\n".join(lines)
     return subject, body
+
+
+class InvestmentAdvisor:
+    """Investment advisor class for IPO analysis."""
+
+    def __init__(self):
+        """Initialize the investment advisor."""
+        pass
+
+    def get_recommendation(self, ipo_data: Dict[str, any]) -> str:
+        """Get investment recommendation for an IPO."""
+        try:
+            company_name = ipo_data.get('company_name', '')
+            price_range = ipo_data.get('price_range', '')
+            sector = ipo_data.get('sector', '')
+
+            # Use the existing analysis function
+            analysis = analyze_ipo_investment(company_name, price_range, sector)
+
+            return analysis.recommendation
+
+        except Exception as e:
+            logger.error(f"Error getting recommendation for {ipo_data.get('company_name', 'Unknown')}: {e}")
+            return "HOLD"
+
+    def analyze_ipo(self, ipo_data: Dict[str, any]) -> Dict[str, any]:
+        """Analyze IPO and return detailed analysis."""
+        try:
+            company_name = ipo_data.get('company_name', '')
+            price_range = ipo_data.get('price_range', '')
+            sector = ipo_data.get('sector', '')
+
+            # Use the existing analysis function
+            analysis = analyze_ipo_investment(company_name, price_range, sector)
+
+            return {
+                'recommendation': analysis.recommendation,
+                'confidence': analysis.confidence,
+                'risk_score': self._calculate_risk_score(analysis.risk_level),
+                'reasoning': analysis.reasoning,
+                'key_factors': analysis.key_factors,
+                'summary': self._generate_summary(analysis)
+            }
+
+        except Exception as e:
+            logger.error(f"Error analyzing IPO {ipo_data.get('company_name', 'Unknown')}: {e}")
+            return {
+                'recommendation': 'HOLD',
+                'confidence': 'LOW',
+                'risk_score': 5.0,
+                'reasoning': ['Analysis failed'],
+                'key_factors': {},
+                'summary': 'Unable to analyze IPO at this time'
+            }
+
+    def _calculate_risk_score(self, risk_level: str) -> float:
+        """Convert risk level to numeric score."""
+        risk_mapping = {
+            'LOW': 2.0,
+            'MEDIUM': 5.0,
+            'HIGH': 7.0,
+            'VERY HIGH': 9.0
+        }
+        return risk_mapping.get(risk_level.upper(), 5.0)
+
+    def _generate_summary(self, analysis: InvestmentAnalysis) -> str:
+        """Generate a summary from the analysis."""
+        summary_parts = []
+
+        if analysis.recommendation:
+            summary_parts.append(f"Recommendation: {analysis.recommendation}")
+
+        if analysis.confidence:
+            summary_parts.append(f"Confidence: {analysis.confidence}")
+
+        if analysis.reasoning:
+            summary_parts.append("Key points: " + "; ".join(analysis.reasoning[:2]))
+
+        return ". ".join(summary_parts) if summary_parts else "Analysis completed"
