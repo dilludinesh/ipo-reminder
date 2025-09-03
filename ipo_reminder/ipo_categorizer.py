@@ -190,7 +190,7 @@ def format_ipo_email_html(today_date, ipos: List) -> Tuple[str, str, str]:
     from .utils import create_email_summary, generate_investment_thesis
 
     formatted_date = today_date.strftime("%d %b %Y")
-    subject = f"IPO Investment Guide • {formatted_date}"
+    subject = f"IPO Reminder • {formatted_date}"
 
     if not ipos:
         text_body = f"No IPOs closing today ({formatted_date}). Your investment guide: Stay patient, focus on quality opportunities."
@@ -205,7 +205,7 @@ def format_ipo_email_html(today_date, ipos: List) -> Tuple[str, str, str]:
     analyzer = DeepIPOAnalyzer()
     
     # --- Enhanced Text Body Generation ---
-    text_lines = [f"Your Personal IPO Investment Guide - {formatted_date}\n"]
+    text_lines = [f"IPO Reminder - {formatted_date}\n"]
     text_lines.append(f"📊 Market Summary: {summary['total_ipos']} IPOs ({summary['main_board']} Main Board, {summary['sme']} SME)\n")
 
     for i, ipo in enumerate(ipos, 1):
@@ -241,7 +241,7 @@ def format_ipo_email_html(today_date, ipos: List) -> Tuple[str, str, str]:
     html_parts = [f"""
     <div style="font-family: Arial, sans-serif; color: #333; max-width: 600px; margin: auto; border: 1px solid #ddd; border-radius: 8px; overflow: hidden;">
         <div style="background-color: #4CAF50; color: white; padding: 20px; text-align: center;">
-            <h1 style="margin: 0;">IPO Investment Guide</h1>
+            <h1 style="margin: 0;">IPO Reminder</h1>
             <p style="margin: 0;">{formatted_date}</p>
             <p style="margin: 5px 0; font-size: 14px;">{summary['total_ipos']} IPOs • {summary['main_board']} Main Board • {summary['sme']} SME</p>
         </div>
