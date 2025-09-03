@@ -156,7 +156,7 @@ if [ $TEST_EXIT_CODE -eq 0 ]; then
     echo "Next steps:"
     echo "1. Set up GitHub secrets (run: ./setup_github_secrets.sh)"
     echo "2. Push changes to GitHub"
-    echo "3. The workflow will run automatically at 9:00 AM IST daily"
+    echo "3. The workflow will run automatically at 6:00 AM IST daily"
     echo "4. Or trigger manually from GitHub Actions tab"
     echo ""
 else

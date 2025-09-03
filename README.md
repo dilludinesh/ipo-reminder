@@ -125,7 +125,7 @@
 Your IPO Reminder system runs **entirely on GitHub's cloud infrastructure** with no local setup required:
 
 1. **Configure Secrets**: Set up email and API credentials in GitHub repository secrets
-2. **Automatic Execution**: System runs daily at 9:00 AM IST via GitHub Actions
+2. **Automatic Execution**: System runs daily at 6:00 AM IST via GitHub Actions
 3. **Cloud Database**: PostgreSQL and Redis services provided by GitHub Actions
 4. **Remote Monitoring**: View execution logs and status in GitHub Actions tab
 
@@ -157,7 +157,7 @@ Go to your GitHub repository: https://github.com/dilludinesh/ipo-reminder
 
 ### Workflow Features
 - ✅ **Cloud-Only Execution**: Runs entirely on GitHub's infrastructure
-- ✅ **Automated Daily Execution**: Runs at 9:00 AM IST every day
+- ✅ **Automated Daily Execution**: Runs at 6:00 AM IST every day
 - ✅ **On-Demand Execution**: Manual trigger available anytime
 - ✅ **PostgreSQL Database**: Cloud database service provided by GitHub
 - ✅ **Redis Caching**: High-performance cloud caching
@@ -171,7 +171,7 @@ Go to your GitHub repository: https://github.com/dilludinesh/ipo-reminder
 ```yaml
 on:
   schedule:
-    - cron: '30 3 * * *'  # 9:00 AM IST daily
+    - cron: '30 0 * * *'  # 6:00 AM IST daily
   workflow_dispatch:       # Manual trigger anytime
   push:
     branches: [ main ]     # Test on code changes
@@ -346,7 +346,7 @@ Your system is **fully deployed and running on GitHub**:
 - **Cost**: Free tier includes unlimited Actions minutes for public repositories
 
 ### Execution Schedule
-- **Daily**: Automatic execution at 9:00 AM IST
+- **Daily**: Automatic execution at 6:00 AM IST
 - **On-Demand**: Manual execution anytime via workflow dispatch
 - **On-Changes**: Automatic testing on code pushes to main branch
 
