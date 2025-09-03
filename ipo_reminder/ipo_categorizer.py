@@ -212,9 +212,12 @@ def format_ipo_email_html(today_date, ipos: List) -> Tuple[str, str, str]:
         company_name = sanitize_input(getattr(ipo, 'name', 'Unknown Company'))
         price_band = sanitize_input(getattr(ipo, 'price_band', None) or getattr(ipo, 'price_range', 'Price TBA'))
         
-        # Get platform information
+        # Get platform information - only add if not already present in name
         platform = getattr(ipo, 'platform', 'Mainboard')
-        platform_display = f" ({platform})"
+        if '(Mainboard)' in company_name or '(SME)' in company_name:
+            platform_display = ""  # Already has platform info
+        else:
+            platform_display = f" ({platform})" if platform != "Mainboard" else ""
         
         # Use enhanced analysis
         analysis = analyzer.analyze_ipo_comprehensive(company_name, price_band)
@@ -250,9 +253,12 @@ def format_ipo_email_html(today_date, ipos: List) -> Tuple[str, str, str]:
         company_name = sanitize_input(getattr(ipo, 'name', 'Unknown Company'))
         price_band = sanitize_input(getattr(ipo, 'price_band', None) or getattr(ipo, 'price_range', 'Price TBA'))
         
-        # Get platform information
+        # Get platform information - only add if not already present in name
         platform = getattr(ipo, 'platform', 'Mainboard')
-        platform_display = f" ({platform})"
+        if '(Mainboard)' in company_name or '(SME)' in company_name:
+            platform_display = ""  # Already has platform info
+        else:
+            platform_display = f" ({platform})" if platform != "Mainboard" else ""
         
         analysis = analyzer.analyze_ipo_comprehensive(company_name, price_band)
         thesis = generate_investment_thesis(company_name, price_band)
