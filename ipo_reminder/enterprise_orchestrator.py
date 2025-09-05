@@ -12,19 +12,19 @@ from ipo_reminder.config import (
     SENDER_EMAIL, SENDER_PASSWORD, RECIPIENT_EMAIL,
     DATABASE_URL, REDIS_URL, BSE_API_KEY, NSE_API_KEY
 )
-from database import DatabaseManager, IPOData, IPORecommendation
-from cache import CacheManager
-from official_apis import BSEAPIClient, NSEAPIClient
-from monitoring import monitoring_system, record_metric, increment_counter
-from compliance import compliance_logger, log_system_startup, log_system_shutdown
-from emailer import Emailer
-from ipo_categorizer import IPOCategorizer
-from investment_advisor import InvestmentAdvisor
-from deep_analyzer import DeepIPOAnalyzer
-from sources.zerodha import ZerodhaScraper
-from sources.moneycontrol import MoneycontrolScraper
-from sources.chittorgarh import ChittorgarhScraper
-from sources.fallback import FallbackScraper
+from .database import DatabaseManager, IPOData, IPORecommendation
+from .cache import CacheManager
+from .official_apis import BSEAPIClient, NSEAPIClient
+from .monitoring import monitoring_system, record_metric, increment_counter
+from .compliance import compliance_logger, log_system_startup, log_system_shutdown
+from .emailer import Emailer
+from .ipo_categorizer import IPOCategorizer
+from .investment_advisor import InvestmentAdvisor
+from .deep_analyzer import DeepIPOAnalyzer
+from .sources.zerodha import ZerodhaScraper
+from .sources.moneycontrol import MoneycontrolScraper
+from .sources.chittorgarh import ChittorgarhScraper
+from .sources.fallback import FallbackScraper
 
 logger = logging.getLogger(__name__)
 

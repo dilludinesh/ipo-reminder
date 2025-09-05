@@ -72,32 +72,36 @@ def setup_database():
 def _insert_initial_data(engine):
     """Insert initial configuration and seed data."""
     try:
+        current_time = datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S')
         with engine.connect() as conn:
-            # Insert system configuration
+            # Insert system configuration - using SQLite compatible syntax
             conn.execute(text("""
-                INSERT INTO system_config (key, value, description, created_at, updated_at)
+                INSERT OR IGNORE INTO system_config (key, value, description, created_at, updated_at)
                 VALUES
-                    ('system_version', '"enterprise-v1.0"', 'Current system version', NOW(), NOW()),
-                    ('database_version', '"1.0"', 'Database schema version', NOW(), NOW()),
-                    ('monitoring_enabled', 'true', 'Enable system monitoring', NOW(), NOW()),
-                    ('cache_enabled', 'true', 'Enable caching system', NOW(), NOW()),
-                    ('audit_enabled', 'true', 'Enable audit logging', NOW(), NOW()),
-                    ('circuit_breaker_enabled', 'true', 'Enable circuit breaker pattern', NOW(), NOW()),
-                    ('max_retry_attempts', '3', 'Maximum retry attempts for failed operations', NOW(), NOW()),
-                    ('cache_ttl_seconds', '3600', 'Default cache TTL in seconds', NOW(), NOW()),
-                    ('alert_cooldown_minutes', '60', 'Alert cooldown period in minutes', NOW(), NOW()),
-                    ('data_retention_days', '365', 'Data retention period in days', NOW(), NOW())
-                ON CONFLICT (key) DO NOTHING;
-            """))
+                    ('system_version', '"enterprise-v1.0"', 'Current system version', :time, :time),
+                    ('database_version', '"1.0"', 'Database schema version', :time, :time),
+                    ('monitoring_enabled', 'true', 'Enable system monitoring', :time, :time),
+                    ('cache_enabled', 'true', 'Enable caching system', :time, :time),
+                    ('audit_enabled', 'true', 'Enable audit logging', :time, :time),
+                    ('circuit_breaker_enabled', 'true', 'Enable circuit breaker pattern', :time, :time),
+                    ('max_retry_attempts', '3', 'Maximum retry attempts for failed operations', :time, :time),
+                    ('cache_ttl_seconds', '3600', 'Default cache TTL in seconds', :time, :time),
+                    ('alert_cooldown_minutes', '60', 'Alert cooldown period in minutes', :time, :time),
+                    ('data_retention_days', '365', 'Data retention period in days', :time, :time);
+            """), {'time': current_time})
 
-            # Insert initial system metrics
+            # Insert initial system metrics - using SQLite compatible syntax
             conn.execute(text("""
-                INSERT INTO system_metrics (metric_name, metric_value, metric_type, labels, timestamp)
+                INSERT OR IGNORE INTO system_metrics (metric_name, metric_value, metric_type, labels, timestamp)
                 VALUES
-                    ('system_setup', 1.0, 'GAUGE', '{"event": "initial_setup"}', NOW()),
-                    ('database_tables_created', 4.0, 'GAUGE', '{"tables": ["ipo_data", "ipo_recommendations", "audit_logs", "system_metrics"]}', NOW())
-                ON CONFLICT DO NOTHING;
-            """))
+                    ('system_setup', 1.0, 'GAUGE', :labels1, :time1),
+                    ('database_tables_created', 4.0, 'GAUGE', :labels2, :time2);
+            """), {
+                'labels1': '{"event": "initial_setup"}',
+                'labels2': '{"tables": ["ipo_data", "ipo_recommendations", "audit_logs", "system_metrics"]}',
+                'time1': current_time,
+                'time2': current_time
+            })
 
             conn.commit()
 

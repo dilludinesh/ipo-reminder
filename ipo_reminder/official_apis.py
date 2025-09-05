@@ -38,7 +38,7 @@ from ipo_reminder.config import (
 )
 from ipo_reminder.rate_limiting import (
     RateLimiter, CircuitBreaker, RateLimitExceeded, CircuitOpenError, Bulkhead,
-    RateLimitConfig, CircuitBreakerConfig
+    RateLimitConfig, CircuitBreakerConfig, CircuitBreakerMixin
 )
 
 # Type variable for generic function wrapping
@@ -311,8 +311,7 @@ class BSEAPIClient:
             return None
 
 class NSEAPIClient(CircuitBreakerMixin):
-    """
-    Official NSE API client with circuit breaker and retry logic.
+    """Official NSE API client with circuit breaker and retry logic.
     
     Features:
     - Circuit breaker pattern to prevent cascading failures
@@ -321,11 +320,12 @@ class NSEAPIClient(CircuitBreakerMixin):
     - Comprehensive error handling and logging
     - Cookie-based session management for NSE
     """
-
+    
     def __init__(self):
-        super().__init__("NSE_API")
+        # Initialize the circuit breaker mixin first
+        super().__init__()
         self.base_url = "https://www.nseindia.com/api"
-        self.timeout = aiohttp.ClientTimeout(total=REQUEST_TIMEOUT)
+        self.timeout = aiohttp.ClientTimeout(total=30)  # 30 seconds timeout
         self.session = None
         self.connector = aiohttp.TCPConnector(
             limit_per_host=10,  # Max connections per host

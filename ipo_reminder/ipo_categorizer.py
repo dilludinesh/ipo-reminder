@@ -7,7 +7,7 @@ import re
 from typing import List, Tuple, Dict
 from dataclasses import dataclass
 
-from utils import sanitize_input, validate_price_band, calculate_risk_score, generate_investment_thesis
+from .utils import sanitize_input, validate_price_band, calculate_risk_score, generate_investment_thesis
 
 logger = logging.getLogger(__name__)
 

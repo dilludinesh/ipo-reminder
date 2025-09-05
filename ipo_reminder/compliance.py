@@ -8,7 +8,7 @@ from dataclasses import dataclass, asdict
 from enum import Enum
 import uuid
 
-from database import DatabaseManager, AuditLog
+from .database import DatabaseManager, AuditLog
 
 logger = logging.getLogger(__name__)
 

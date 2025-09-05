@@ -1,18 +1,25 @@
 """Configuration settings for the Enterprise IPO Reminder."""
 import os
-import logging
 from typing import Optional
 from pathlib import Path
 
-# Configure logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    handlers=[
-        logging.StreamHandler()
-    ]
+# Import the logging configuration
+from .logging_config import get_logger, setup_logging
+
+# Set up logging with default configuration
+LOG_LEVEL = os.getenv('LOG_LEVEL', 'INFO')
+LOG_FILE = os.getenv('LOG_FILE', 'logs/ipo_reminder.log')
+LOG_FORMAT = os.getenv('LOG_FORMAT', 'text')
+
+# Initialize logging
+setup_logging(
+    log_level=LOG_LEVEL,
+    log_file=LOG_FILE,
+    log_format=LOG_FORMAT,
 )
-logger = logging.getLogger(__name__)
+
+# Create a logger for this module
+logger = get_logger(__name__)
 
 # Email Configuration
 SENDER_EMAIL = os.getenv("SENDER_EMAIL") or os.getenv("OUTLOOK_EMAIL")
@@ -20,7 +27,7 @@ SENDER_PASSWORD = os.getenv("SENDER_PASSWORD") or os.getenv("OUTLOOK_APP_PASSWOR
 RECIPIENT_EMAIL = os.getenv("RECIPIENT_EMAIL", SENDER_EMAIL)
 
 # Database Configuration
-DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://user:password@localhost:5432/ipo_reminder")
+DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///ipo_reminder.db")
 DB_POOL_SIZE = int(os.getenv("DB_POOL_SIZE", "10"))
 DB_MAX_OVERFLOW = int(os.getenv("DB_MAX_OVERFLOW", "20"))
 DB_POOL_TIMEOUT = int(os.getenv("DB_POOL_TIMEOUT", "30"))

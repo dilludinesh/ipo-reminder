@@ -210,6 +210,22 @@ class CircuitOpenError(Exception):
     """Raised when the circuit breaker is open."""
     pass
 
+
+class CircuitBreakerMixin:
+    """Mixin class that adds circuit breaker functionality to API clients."""
+    
+    def __init__(self, *args, **kwargs):
+        # Initialize the circuit breaker with default config
+        self.circuit_breaker = CircuitBreaker(
+            self.__class__.__name__,
+            CircuitBreakerConfig()
+        )
+        super().__init__(*args, **kwargs)
+    
+    async def _execute_with_circuit_breaker(self, func: Callable[..., Awaitable[Any]], *args, **kwargs):
+        """Execute a function with circuit breaker protection."""
+        return await self.circuit_breaker.execute(func, *args, **kwargs)
+
 def rate_limited(requests: int = 10, window: int = 60):
     """Decorator to rate limit function calls."""
     def decorator(func: F) -> F:
