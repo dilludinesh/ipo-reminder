@@ -89,6 +89,20 @@ jobs:
         echo "Database URL: $DATABASE_URL"
 
         # Wait for PostgreSQL to be ready
+    - name: Check required secrets
+      run: |
+        missing=0
+        for secret in SENDER_EMAIL SENDER_PASSWORD RECIPIENT_EMAIL ENCRYPTION_KEY JWT_SECRET_KEY; do
+          if [ -z "${{ secrets[$secret] }}" ]; then
+            echo "❌ Missing required secret: $secret"
+            missing=1
+          fi
+        done
+        if [ "$missing" -eq 1 ]; then
+          echo "❌ One or more required secrets are missing. Please add them in GitHub repository settings."
+          exit 1
+        fi
+
         echo "⏳ Waiting for PostgreSQL to be ready..."
         for i in {1..30}; do
           if pg_isready -h localhost -p 5432 -U postgres; then
@@ -127,6 +141,13 @@ jobs:
         DATABASE_URL: postgresql://postgres:postgres@localhost:5432/ipo_reminder
         REDIS_URL: redis://localhost:6379/0
         BSE_API_KEY: ${{ secrets.BSE_API_KEY }}
+            echo "❌ Failure detected. Please check the following:"
+            echo "- All required secrets are set in GitHub repository settings."
+            echo "- Database and Redis services are running."
+            echo "- Network connectivity to IPO data sources."
+            echo "- Python dependencies are installed."
+            echo "- Email configuration is valid."
+            echo "- See logs above for details."
         NSE_API_KEY: ${{ secrets.NSE_API_KEY }}
         ENCRYPTION_KEY: default-encryption-key-32-chars-long
         JWT_SECRET_KEY: default-jwt-secret-key-32-chars-long
