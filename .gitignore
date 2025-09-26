@@ -118,3 +118,6 @@ SYSTEM_RELIABILITY_*.md
 
 # Pyre type checker
 .pyre/
+
+# Dev container files
+.devcontainer/
