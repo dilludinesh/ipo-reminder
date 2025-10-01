@@ -632,7 +632,7 @@ class EmailLog(Base):
                         comment="Number of times links were clicked")
     
     # Metadata
-    metadata = Column(JSON,
+    additional_metadata = Column(JSON,
                      comment="Additional metadata and tracking information")
     
     # Audit fields
