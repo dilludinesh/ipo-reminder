@@ -45,9 +45,6 @@ jobs:
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
-        # Initialize with SQL commands
-        volumes:
-          - ./init-db.sql:/docker-entrypoint-initdb.d/init-db.sql
 
       redis:
         image: redis:7-alpine
@@ -114,15 +111,15 @@ jobs:
 
     - name: Setup database
       env:
-        DATABASE_URL: postgresql://postgres:postgres@localhost:5432/ipo_reminder
+        POSTGRES_PASSWORD: postgres
+        TARGET_DB: ipo_reminder
+        DB_USER: ipo_user
+        DB_PASSWORD: ipo_password
       run: |
-        echo "📊 Setting up database..."
-        echo "Database URL: $DATABASE_URL"
-
         # Wait for PostgreSQL to be ready
         echo "⏳ Waiting for PostgreSQL to be ready..."
         for i in {1..30}; do
-          if PGPASSWORD=postgres pg_isready -h localhost -p 5432 -U postgres -d ipo_reminder; then
+          if PGPASSWORD=$POSTGRES_PASSWORD pg_isready -h localhost -p 5432 -U postgres -d postgres; then
             echo "✅ PostgreSQL is ready!"
             break
           fi
@@ -131,6 +128,30 @@ jobs:
             exit 1
           fi
           echo "Waiting for PostgreSQL... ($i/30)"
+          sleep 2
+        done
+
+        # Create database and user
+        echo "Creating database and user..."
+        PGPASSWORD=$POSTGRES_PASSWORD psql -h localhost -U postgres -c "CREATE USER $DB_USER WITH PASSWORD '$DB_PASSWORD';" || true
+        PGPASSWORD=$POSTGRES_PASSWORD psql -h localhost -U postgres -c "CREATE DATABASE $TARGET_DB;" || true
+        PGPASSWORD=$POSTGRES_PASSWORD psql -h localhost -U postgres -c "GRANT ALL PRIVILEGES ON DATABASE $TARGET_DB TO $DB_USER;"
+        
+        # Update DATABASE_URL for subsequent steps
+        echo "DATABASE_URL=postgresql://$DB_USER:$DB_PASSWORD@localhost:5432/$TARGET_DB" >> $GITHUB_ENV
+        
+        # Wait for the new database to be ready
+        echo "Waiting for database to be ready..."
+        for i in {1..30}; do
+          if PGPASSWORD=$DB_PASSWORD psql -h localhost -U $DB_USER -d $TARGET_DB -c "SELECT 1" &>/dev/null; then
+            echo "✅ Database is ready!"
+            break
+          fi
+          if [ $i -eq 30 ]; then
+            echo "❌ Database is not ready after 30 attempts. Failing..."
+            exit 1
+          fi
+          echo "Waiting for database... ($i/30)"
           sleep 2
         done
         
