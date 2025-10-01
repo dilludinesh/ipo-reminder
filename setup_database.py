@@ -26,9 +26,16 @@ def setup_database():
         # Create sync engine for setup (Alembic operations need sync)
         engine = create_engine(SYNC_DATABASE_URL, echo=True)
 
+        # Grant necessary permissions
+        with engine.connect() as conn:
+            conn.execute(text('CREATE SCHEMA IF NOT EXISTS public'))
+            conn.execute(text('GRANT ALL ON SCHEMA public TO ipo_user'))
+            conn.execute(text('GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO ipo_user'))
+            conn.execute(text('ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO ipo_user'))
+        
         # Create all tables
         logger.info("Creating database tables...")
-        Base.metadata.create_all(bind=engine)
+        Base.metadata.create_all(engine)
 
         # Create indexes for better performance
         with engine.connect() as conn:
