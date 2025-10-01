@@ -170,32 +170,35 @@ jobs:
           sleep 2
         done
 
-        # Test database connection
+        # Test database connection with explicit URL
         echo "🔍 Testing database connection..."
+        TEST_DB_URL="postgresql://$DB_USER:$DB_PASSWORD@localhost:5432/$TARGET_DB"
         python -c "
         import os
         from sqlalchemy import create_engine, text
         try:
-            engine = create_engine(os.getenv('DATABASE_URL'))
+            # Use the explicit URL instead of os.getenv
+            engine = create_engine('$TEST_DB_URL')
             with engine.connect() as conn:
                 result = conn.execute(text('SELECT version();'))
                 version = result.fetchone()[0]
                 print(f'✅ Connected to PostgreSQL: {version[:50]}...')
         except Exception as e:
             print(f'❌ Database connection failed: {e}')
+            print(f'Connection URL used: $TEST_DB_URL')
             exit(1)
         "
 
-        # Run database setup
+        # Run database setup with explicit URL
         echo "🏗️ Running database setup..."
-        python setup_database.py setup
+        DATABASE_URL="postgresql://$DB_USER:$DB_PASSWORD@localhost:5432/$TARGET_DB" python setup_database.py setup
 
     - name: Run Enterprise IPO Reminder
       env:
         SENDER_EMAIL: ${{ secrets.SENDER_EMAIL }}
         SENDER_PASSWORD: ${{ secrets.SENDER_PASSWORD }}
         RECIPIENT_EMAIL: ${{ secrets.RECIPIENT_EMAIL }}
-        DATABASE_URL: postgresql://postgres:postgres@localhost:5432/ipo_reminder
+        DATABASE_URL: postgresql://ipo_user:ipo_password@localhost:5432/ipo_reminder
         REDIS_URL: redis://localhost:6379/0
         BSE_API_KEY: ${{ secrets.BSE_API_KEY }}
         NSE_API_KEY: ${{ secrets.NSE_API_KEY }}

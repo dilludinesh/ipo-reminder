@@ -11,7 +11,8 @@ from sqlalchemy.exc import SQLAlchemyError
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from ipo_reminder.database import Base, DatabaseManager
-from ipo_reminder.config import DATABASE_URL
+# Get database URL from environment or use default
+DATABASE_URL = os.getenv('DATABASE_URL', 'postgresql://ipo_user:ipo_password@localhost:5432/ipo_reminder')
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
