@@ -18,7 +18,7 @@ SYNC_DATABASE_URL = DATABASE_URL.replace('+asyncpg', '')  # Convert to sync URL 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-async def setup_database():
+def setup_database():
     """Set up the database with all tables and initial data."""
     try:
         logger.info("Setting up enterprise database...")
