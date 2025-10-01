@@ -75,11 +75,39 @@ jobs:
 
     - name: Install dependencies
       run: |
+        # Install system dependencies
+        sudo apt-get update
+        sudo apt-get install -y postgresql-client redis-tools curl
+        
+        # Install Python dependencies
         python -m pip install --upgrade pip
         pip install -r requirements.txt
 
     - name: Create logs directory
       run: mkdir -p logs
+
+    - name: Check required secrets
+      id: check_secrets
+      run: |
+        echo "🔒 Checking required secrets..."
+        missing=0
+        if [ -z "${{ secrets.SENDER_EMAIL }}" ]; then
+          echo "❌ Missing required secret: SENDER_EMAIL"
+          missing=1
+        fi
+        if [ -z "${{ secrets.SENDER_PASSWORD }}" ]; then
+          echo "❌ Missing required secret: SENDER_PASSWORD"
+          missing=1
+        fi
+        if [ -z "${{ secrets.RECIPIENT_EMAIL }}" ]; then
+          echo "❌ Missing required secret: RECIPIENT_EMAIL"
+          missing=1
+        fi
+        if [ "$missing" -eq 1 ]; then
+          echo "❌ One or more required secrets are missing. Please add them in GitHub repository settings under Settings > Secrets and variables > Actions."
+          exit 1
+        fi
+        echo "✅ All required secrets are present"
 
     - name: Setup database
       env:
@@ -89,27 +117,32 @@ jobs:
         echo "Database URL: $DATABASE_URL"
 
         # Wait for PostgreSQL to be ready
-    - name: Check required secrets
-      run: |
-        missing=0
-        for secret in SENDER_EMAIL SENDER_PASSWORD RECIPIENT_EMAIL ENCRYPTION_KEY JWT_SECRET_KEY; do
-          if [ -z "${{ secrets[$secret] }}" ]; then
-            echo "❌ Missing required secret: $secret"
-            missing=1
-          fi
-        done
-        if [ "$missing" -eq 1 ]; then
-          echo "❌ One or more required secrets are missing. Please add them in GitHub repository settings."
-          exit 1
-        fi
-
         echo "⏳ Waiting for PostgreSQL to be ready..."
         for i in {1..30}; do
-          if pg_isready -h localhost -p 5432 -U postgres; then
+          if PGPASSWORD=postgres pg_isready -h localhost -p 5432 -U postgres -d ipo_reminder; then
             echo "✅ PostgreSQL is ready!"
             break
           fi
-          echo "Waiting... ($i/30)"
+          if [ $i -eq 30 ]; then
+            echo "❌ PostgreSQL is not ready after 30 attempts. Failing..."
+            exit 1
+          fi
+          echo "Waiting for PostgreSQL... ($i/30)"
+          sleep 2
+        done
+        
+        # Wait for Redis to be ready
+        echo "⏳ Waiting for Redis to be ready..."
+        for i in {1..30}; do
+          if redis-cli -h localhost -p 6379 ping | grep -q PONG; then
+            echo "✅ Redis is ready!"
+            break
+          fi
+          if [ $i -eq 30 ]; then
+            echo "❌ Redis is not ready after 30 attempts. Failing..."
+            exit 1
+          fi
+          echo "Waiting for Redis... ($i/30)"
           sleep 2
         done
 
@@ -141,16 +174,9 @@ jobs:
         DATABASE_URL: postgresql://postgres:postgres@localhost:5432/ipo_reminder
         REDIS_URL: redis://localhost:6379/0
         BSE_API_KEY: ${{ secrets.BSE_API_KEY }}
-            echo "❌ Failure detected. Please check the following:"
-            echo "- All required secrets are set in GitHub repository settings."
-            echo "- Database and Redis services are running."
-            echo "- Network connectivity to IPO data sources."
-            echo "- Python dependencies are installed."
-            echo "- Email configuration is valid."
-            echo "- See logs above for details."
         NSE_API_KEY: ${{ secrets.NSE_API_KEY }}
-        ENCRYPTION_KEY: default-encryption-key-32-chars-long
-        JWT_SECRET_KEY: default-jwt-secret-key-32-chars-long
+        ENCRYPTION_KEY: ${{ secrets.ENCRYPTION_KEY || 'default-encryption-key-32-chars-long' }}
+        JWT_SECRET_KEY: ${{ secrets.JWT_SECRET_KEY || 'default-jwt-secret-key-32-chars-long' }}
         ENTERPRISE_MODE: true
         MONITORING_ENABLED: true
         AUDIT_ENABLED: true
