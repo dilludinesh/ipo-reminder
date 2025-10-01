@@ -12,18 +12,19 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from ipo_reminder.database import Base, DatabaseManager
 # Get database URL from environment or use default
-DATABASE_URL = os.getenv('DATABASE_URL', 'postgresql://ipo_user:ipo_password@localhost:5432/ipo_reminder')
+DATABASE_URL = os.getenv('DATABASE_URL', 'postgresql+asyncpg://ipo_user:ipo_password@localhost:5432/ipo_reminder')
+SYNC_DATABASE_URL = DATABASE_URL.replace('+asyncpg', '')  # Convert to sync URL for setup
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-def setup_database():
+async def setup_database():
     """Set up the database with all tables and initial data."""
     try:
         logger.info("Setting up enterprise database...")
 
-        # Create engine
-        engine = create_engine(DATABASE_URL, echo=True)
+        # Create sync engine for setup (Alembic operations need sync)
+        engine = create_engine(SYNC_DATABASE_URL, echo=True)
 
         # Create all tables
         logger.info("Creating database tables...")
@@ -228,6 +229,7 @@ def main():
             setup_database()
             migrate_database()
             verify_database_setup()
+            cleanup_old_data()
         else:
             print("Usage: python setup_database.py [setup|migrate|verify|cleanup|all]")
             sys.exit(1)
@@ -236,6 +238,7 @@ def main():
         setup_database()
         migrate_database()
         verify_database_setup()
+        cleanup_old_data()
 
 if __name__ == "__main__":
     main()

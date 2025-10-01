@@ -7,10 +7,11 @@ pandas>=2.2.2
 python-dotenv>=0.19.0
 
 # Database & Caching
-sqlalchemy>=2.0.0
+sqlalchemy[asyncio]>=2.0.0
 alembic>=1.12.0
 redis>=5.0.0
 psycopg2-binary>=2.9.0  # For PostgreSQL
+asyncpg>=0.27.0  # Async PostgreSQL driver
 
 # Email and validation
 secure-smtplib>=0.1.1
