@@ -20,19 +20,26 @@ setup_logging(
 
 # Create a logger for this module
 logger = get_logger(__name__)
-
 # Email Configuration
 SENDER_EMAIL = os.getenv("SENDER_EMAIL") or os.getenv("OUTLOOK_EMAIL")
 SENDER_PASSWORD = os.getenv("SENDER_PASSWORD") or os.getenv("OUTLOOK_APP_PASSWORD")
 RECIPIENT_EMAIL = os.getenv("RECIPIENT_EMAIL", SENDER_EMAIL)
 
-# Database Configuration
-DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///ipo_reminder.db")
+# Database configuration
+# For local development with SQLite
+# DATABASE_URL = "sqlite+aiosqlite:///./ipo_reminder.db"
+
+# For production with PostgreSQL
+DATABASE_URL = os.getenv(
+    "DATABASE_URL",
+    "postgresql+asyncpg://postgres:postgres@localhost:5432/ipo_reminder"
+)
 DB_POOL_SIZE = int(os.getenv("DB_POOL_SIZE", "10"))
 DB_MAX_OVERFLOW = int(os.getenv("DB_MAX_OVERFLOW", "20"))
 DB_POOL_TIMEOUT = int(os.getenv("DB_POOL_TIMEOUT", "30"))
 
 # Redis Cache Configuration
+{{ ... }}
 REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0")
 CACHE_TTL_SECONDS = int(os.getenv("CACHE_TTL_SECONDS", "3600"))  # 1 hour default
 CACHE_MAX_MEMORY = os.getenv("CACHE_MAX_MEMORY", "256mb")
