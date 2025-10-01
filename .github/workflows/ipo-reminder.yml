@@ -189,27 +189,33 @@ jobs:
             exit(1)
         "
 
+        # Run database setup with superuser privileges first
+        echo "🔧 Setting up database with superuser privileges..."
+        PGPASSWORD=postgres psql -h localhost -U postgres -c "\
+            DROP DATABASE IF EXISTS $TARGET_DB;\
+            DROP USER IF EXISTS $DB_USER;\
+            CREATE USER $DB_USER WITH PASSWORD '$DB_PASSWORD';
+            CREATE DATABASE $TARGET_DB;\
+            GRANT ALL PRIVILEGES ON DATABASE $TARGET_DB TO $DB_USER;\
+        "
+
         # Run database setup with async URL
         echo "🏗️ Running database setup..."
         DATABASE_URL="postgresql+asyncpg://$DB_USER:$DB_PASSWORD@localhost:5432/$TARGET_DB" python setup_database.py setup
 
     - name: Run Enterprise IPO Reminder
       env:
-        SENDER_EMAIL: ${{ secrets.SENDER_EMAIL }}
-        SENDER_PASSWORD: ${{ secrets.SENDER_PASSWORD }}
-        RECIPIENT_EMAIL: ${{ secrets.RECIPIENT_EMAIL }}
         DATABASE_URL: postgresql+asyncpg://ipo_user:ipo_password@localhost:5432/ipo_reminder
         REDIS_URL: redis://localhost:6379/0
-        BSE_API_KEY: ${{ secrets.BSE_API_KEY }}
-        NSE_API_KEY: ${{ secrets.NSE_API_KEY }}
-        ENCRYPTION_KEY: ${{ secrets.ENCRYPTION_KEY || 'default-encryption-key-32-chars-long' }}
-        JWT_SECRET_KEY: ${{ secrets.JWT_SECRET_KEY || 'default-jwt-secret-key-32-chars-long' }}
+        BSE_API_KEY: ${{ secrets.BSE_API_KEY || 'test_bse_key_12345' }}
+        NSE_API_KEY: ${{ secrets.NSE_API_KEY || 'test_nse_key_12345' }}
+        ENCRYPTION_KEY: ${{ secrets.ENCRYPTION_KEY || 'test_enc_key_32_chars_long_123456' }}
+        JWT_SECRET_KEY: ${{ secrets.JWT_SECRET_KEY || 'test_jwt_key_32_chars_long_789012' }}
         ENTERPRISE_MODE: true
         MONITORING_ENABLED: true
         AUDIT_ENABLED: true
         LOG_LEVEL: ${{ github.event.inputs.execution_mode == 'verbose' && 'DEBUG' || 'INFO' }}
         EXECUTION_MODE: ${{ github.event.inputs.execution_mode || 'normal' }}
-        CUSTOM_MESSAGE: ${{ github.event.inputs.custom_message || '' }}
       run: |
         echo "🚀 ENTERPRISE IPO REMINDER WORKFLOW"
         echo "==================================="
