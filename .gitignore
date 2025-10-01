@@ -105,7 +105,6 @@ logs/
 *~
 
 # Application specific
-test_*.py
 scripts/
 SETUP_*.md
 EMAIL_SETUP_*.md
