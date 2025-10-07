@@ -39,7 +39,7 @@ DB_MAX_OVERFLOW = int(os.getenv("DB_MAX_OVERFLOW", "20"))
 DB_POOL_TIMEOUT = int(os.getenv("DB_POOL_TIMEOUT", "30"))
 
 # Redis Cache Configuration
-{{ ... }}
+# Configure Redis connection details and cache settings
 REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0")
 CACHE_TTL_SECONDS = int(os.getenv("CACHE_TTL_SECONDS", "3600"))  # 1 hour default
 CACHE_MAX_MEMORY = os.getenv("CACHE_MAX_MEMORY", "256mb")

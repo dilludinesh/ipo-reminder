@@ -191,13 +191,28 @@ jobs:
 
         # Run database setup with superuser privileges first
         echo "🔧 Setting up database with superuser privileges..."
-        PGPASSWORD=postgres psql -h localhost -U postgres -c "\
-            DROP DATABASE IF EXISTS $TARGET_DB;\
-            DROP USER IF EXISTS $DB_USER;\
-            CREATE USER $DB_USER WITH PASSWORD '$DB_PASSWORD';
-            CREATE DATABASE $TARGET_DB;\
-            GRANT ALL PRIVILEGES ON DATABASE $TARGET_DB TO $DB_USER;\
-        "
+        
+        # Drop existing connections to the database first
+        PGPASSWORD=$POSTGRES_PASSWORD psql -h localhost -U postgres -d postgres -c "
+            SELECT pg_terminate_backend(pg_stat_activity.pid)
+            FROM pg_stat_activity
+            WHERE pg_stat_activity.datname = '$TARGET_DB'
+            AND pid <> pg_backend_pid();"
+            
+        # Drop and recreate database in separate commands
+        PGPASSWORD=$POSTGRES_PASSWORD dropdb -h localhost -U postgres --if-exists $TARGET_DB
+        PGPASSWORD=$POSTGRES_PASSWORD dropuser -h localhost -U postgres --if-exists $DB_USER
+        
+        # Create user and database
+        PGPASSWORD=$POSTGRES_PASSWORD createuser -h localhost -U postgres $DB_USER
+        PGPASSWORD=$POSTGRES_PASSWORD createdb -h localhost -U postgres -O $DB_USER $TARGET_DB
+        
+        # Grant privileges
+        PGPASSWORD=$POSTGRES_PASSWORD psql -h localhost -U postgres -d $TARGET_DB -c "
+            GRANT ALL PRIVILEGES ON DATABASE $TARGET_DB TO $DB_USER;
+            GRANT ALL ON SCHEMA public TO $DB_USER;
+            GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO $DB_USER;
+            ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO $DB_USER;"
 
         # Run database setup with async URL
         echo "🏗️ Running database setup..."
