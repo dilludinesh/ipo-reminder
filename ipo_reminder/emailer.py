@@ -192,12 +192,12 @@ class Emailer:
             bool: True if email sent successfully, False otherwise
         """
         try:
-            # Call the existing send_email function
+            # Call the existing send_email function with correct parameters
             return send_email(
                 subject=subject,
-                html_content=html_content,
-                recipient_email=recipient_email,
-                sender_name=sender_name
+                body="This email contains HTML content. Please view in HTML mode.",  # Plain text body
+                html_body=html_content,
+                recipients=[recipient_email] if recipient_email else None
             )
         except Exception as e:
             logger.error(f"Emailer.send_email failed: {e}")
