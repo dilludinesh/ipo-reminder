@@ -131,17 +131,41 @@ jobs:
           sleep 2
         done
 
-        # Create database and user
-        echo "Creating database and user..."
-        PGPASSWORD=$POSTGRES_PASSWORD psql -h localhost -U postgres -c "CREATE USER $DB_USER WITH PASSWORD '$DB_PASSWORD';" || true
-        PGPASSWORD=$POSTGRES_PASSWORD psql -h localhost -U postgres -c "CREATE DATABASE $TARGET_DB;" || true
-        PGPASSWORD=$POSTGRES_PASSWORD psql -h localhost -U postgres -c "GRANT ALL PRIVILEGES ON DATABASE $TARGET_DB TO $DB_USER;"
+        # Drop existing connections and clean up
+        echo "🔧 Cleaning up existing connections and objects..."
+        PGPASSWORD=$POSTGRES_PASSWORD psql -h localhost -U postgres -d postgres -c "
+            SELECT pg_terminate_backend(pg_stat_activity.pid)
+            FROM pg_stat_activity
+            WHERE (pg_stat_activity.datname = '$TARGET_DB' OR pg_stat_activity.usename = '$DB_USER')
+            AND pid <> pg_backend_pid();" || true
+
+        # Drop and recreate user and database
+        echo "🔄 Recreating database and user..."
+        PGPASSWORD=$POSTGRES_PASSWORD dropdb -h localhost -U postgres --if-exists $TARGET_DB || true
+        PGPASSWORD=$POSTGRES_PASSWORD dropuser -h localhost -U postgres --if-exists $DB_USER || true
         
+        # Create user with password and database
+        PGPASSWORD=$POSTGRES_PASSWORD psql -h localhost -U postgres -c "CREATE USER $DB_USER WITH PASSWORD '$DB_PASSWORD' CREATEDB;"
+        PGPASSWORD=$POSTGRES_PASSWORD createdb -h localhost -U postgres -O $DB_USER $TARGET_DB
+        
+        # Set up privileges
+        echo "🔑 Setting up database privileges..."
+        PGPASSWORD=$POSTGRES_PASSWORD psql -h localhost -U postgres -d $TARGET_DB -c "
+            GRANT ALL PRIVILEGES ON DATABASE $TARGET_DB TO $DB_USER;
+            GRANT ALL ON SCHEMA public TO $DB_USER;
+            GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO $DB_USER;
+            GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO $DB_USER;
+            GRANT ALL PRIVILEGES ON ALL FUNCTIONS IN SCHEMA public TO $DB_USER;
+            ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO $DB_USER;
+            ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON SEQUENCES TO $DB_USER;
+            ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON FUNCTIONS TO $DB_USER;"
+
         # Update DATABASE_URL for subsequent steps
-        echo "DATABASE_URL=postgresql://$DB_USER:$DB_PASSWORD@localhost:5432/$TARGET_DB" >> $GITHUB_ENV
+        echo "DATABASE_URL=postgresql+psycopg2://$DB_USER:$DB_PASSWORD@localhost:5432/$TARGET_DB" > .env
+        echo "TEST_DATABASE_URL=postgresql+psycopg2://$DB_USER:$DB_PASSWORD@localhost:5432/${TARGET_DB}_test" >> .env
         
         # Wait for the new database to be ready
-        echo "Waiting for database to be ready..."
+        echo "⏳ Waiting for database to be ready..."
         for i in {1..30}; do
           if PGPASSWORD=$DB_PASSWORD psql -h localhost -U $DB_USER -d $TARGET_DB -c "SELECT 1" &>/dev/null; then
             echo "✅ Database is ready!"
@@ -154,65 +178,36 @@ jobs:
           echo "Waiting for database... ($i/30)"
           sleep 2
         done
-        
-        # Wait for Redis to be ready
-        echo "⏳ Waiting for Redis to be ready..."
-        for i in {1..30}; do
-          if redis-cli -h localhost -p 6379 ping | grep -q PONG; then
-            echo "✅ Redis is ready!"
-            break
-          fi
-          if [ $i -eq 30 ]; then
-            echo "❌ Redis is not ready after 30 attempts. Failing..."
-            exit 1
-          fi
-          echo "Waiting for Redis... ($i/30)"
-          sleep 2
-        done
 
         # Test database connection with explicit URL (using psycopg2 for sync connection test)
         echo "🔍 Testing database connection..."
         TEST_DB_URL="postgresql+psycopg2://$DB_USER:$DB_PASSWORD@localhost:5432/$TARGET_DB"
         python -c "
-        import os
-        from sqlalchemy import create_engine, text
-        try:
-            # Use psycopg2 for sync connection test
-            engine = create_engine('$TEST_DB_URL')
-            with engine.connect() as conn:
-                result = conn.execute(text('SELECT version();'))
-                version = result.fetchone()[0]
-                print(f'✅ Connected to PostgreSQL: {version[:50]}...')
-        except Exception as e:
-            print(f'❌ Database connection failed: {e}')
-            print(f'Connection URL used: $TEST_DB_URL')
-            exit(1)
-        "
-
-        # Run database setup with superuser privileges first
-        echo "🔧 Setting up database with superuser privileges..."
+import os
+from sqlalchemy import create_engine, text
+try:
+    # Use psycopg2 for sync connection test
+    engine = create_engine('$TEST_DB_URL')
+    with engine.connect() as conn:
+        result = conn.execute(text('SELECT version();'))
+        version = result.fetchone()[0]
+        print(f'✅ Connected to PostgreSQL: {version[:50]}...')
         
-        # Drop existing connections to the database first
-        PGPASSWORD=$POSTGRES_PASSWORD psql -h localhost -U postgres -d postgres -c "
-            SELECT pg_terminate_backend(pg_stat_activity.pid)
-            FROM pg_stat_activity
-            WHERE pg_stat_activity.datname = '$TARGET_DB'
-            AND pid <> pg_backend_pid();"
-            
-        # Drop and recreate database in separate commands
-        PGPASSWORD=$POSTGRES_PASSWORD dropdb -h localhost -U postgres --if-exists $TARGET_DB
-        PGPASSWORD=$POSTGRES_PASSWORD dropuser -h localhost -U postgres --if-exists $DB_USER
+        # Verify user has proper permissions
+        result = conn.execute(text("SELECT current_user, current_database();"))
+        user, db = result.fetchone()
+        print(f'🔑 Connected as user: {user} to database: {db}')
         
-        # Create user and database
-        PGPASSWORD=$POSTGRES_PASSWORD createuser -h localhost -U postgres $DB_USER
-        PGPASSWORD=$POSTGRES_PASSWORD createdb -h localhost -U postgres -O $DB_USER $TARGET_DB
+        # Check if user can create tables
+        conn.execute(text('CREATE TABLE IF NOT EXISTS test_permissions (id SERIAL PRIMARY KEY, name TEXT);'))
+        conn.execute(text('DROP TABLE IF EXISTS test_permissions;'))
+        print('✅ Verified user has proper permissions')
         
-        # Grant privileges
-        PGPASSWORD=$POSTGRES_PASSWORD psql -h localhost -U postgres -d $TARGET_DB -c "
-            GRANT ALL PRIVILEGES ON DATABASE $TARGET_DB TO $DB_USER;
-            GRANT ALL ON SCHEMA public TO $DB_USER;
-            GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO $DB_USER;
-            ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO $DB_USER;"
+except Exception as e:
+    print(f'❌ Database connection failed: {e}')
+    print(f'Connection URL used: $TEST_DB_URL')
+    exit(1)
+"
 
         # Run database setup with async URL
         echo "🏗️ Running database setup..."
