@@ -52,8 +52,8 @@ def setup_database():
 
             # Index for audit logs
             conn.execute(text("""
-                CREATE INDEX IF NOT EXISTS idx_audit_logs_timestamp
-                ON audit_logs (timestamp);
+                CREATE INDEX IF NOT EXISTS idx_audit_logs_created_at
+                ON audit_logs (created_at);
             """))
 
             # Index for system metrics
@@ -195,7 +195,7 @@ def cleanup_old_data():
 
             result = session.execute(text("""
                 DELETE FROM audit_logs
-                WHERE timestamp < :cutoff_date;
+                WHERE created_at < :cutoff_date;
             """), {'cutoff_date': cutoff_date})
 
             deleted_audit = result.rowcount
